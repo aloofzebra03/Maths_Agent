@@ -24,18 +24,18 @@ from educational_agent_math_tutor.nodes import (
 
 def create_node_wrapper(node_func, node_name: str):
     """
-    Create a wrapper for a node that tracks transitions.
+    Create a wrapper for a node that tracks transitions and detects new user messages.
     
-    This simple wrapper:
-    1. Updates current_state to node_name
-    2. Appends transition info to node_transitions
-    3. Calls the actual node function
-    4. Returns the node's state update
+    This wrapper:
+    1. Captures old state before node call
+    2. Detects new HumanMessages added after interrupt
+    3. Stores last user message in state for debugging
+    4. Tracks node transitions
+    5. Calls the actual node function
+    6. Returns the node's state update
     
     Future Enhancement:
     When adding memory optimization later, you can enhance this wrapper to:
-    - Capture old state before node call
-    - Detect new user messages
     - Build conversation summaries
     - Populate summary and summary_last_index fields
     
@@ -51,12 +51,30 @@ def create_node_wrapper(node_func, node_name: str):
         print(f"🔄 TRANSITION TO: {node_name}")
         print(f"{'='*60}")
         
+        # Capture old state to detect new messages
+        old_last_user_msg = state.get("last_user_msg")
+        messages = state.get("messages", [])
+        
+        # Find the last HumanMessage in current state
+        current_last_human_msg = None
+        for msg in reversed(messages):
+            if hasattr(msg, '__class__') and msg.__class__.__name__ == 'HumanMessage':
+                current_last_human_msg = msg.content
+                break
+        
+        # Detect if there's a NEW human message (after interrupt resume)
+        if current_last_human_msg and current_last_human_msg != old_last_user_msg:
+            print(f"🆕 NEW USER MESSAGE DETECTED:")
+            print(f"   Old: {old_last_user_msg[:50] if old_last_user_msg else 'None'}...")
+            print(f"   New: {current_last_human_msg[:50]}...")
+        
         # Track transition
         transitions = state.get("node_transitions", [])
         transitions.append({
             "timestamp": datetime.now().isoformat(),
             "to_node": node_name,
-            "message_index": len(state.get("messages", []))
+            "message_index": len(messages),
+            "last_user_msg": current_last_human_msg[:50] if current_last_human_msg else None
         })
         
         # Call the actual node
@@ -65,6 +83,10 @@ def create_node_wrapper(node_func, node_name: str):
         # Ensure transition list is in the update if node doesn't include it
         if "node_transitions" not in node_update:
             node_update["node_transitions"] = transitions
+        
+        # Store the last user message for debugging and node access
+        if current_last_human_msg:
+            node_update["last_user_msg"] = current_last_human_msg
         
         return node_update
     
