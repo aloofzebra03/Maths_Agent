@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Literal
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
+from langchain_core.messages import HumanMessage
 
 from educational_agent_math_tutor.schemas import MathAgentState
 from educational_agent_math_tutor.nodes import (
@@ -26,13 +27,13 @@ def create_node_wrapper(node_func, node_name: str):
     """
     Create a wrapper for a node that tracks transitions and detects new user messages.
     
-    This wrapper:
+    This wrapper (following reference implementation pattern):
     1. Captures old state before node call
-    2. Detects new HumanMessages added after interrupt
-    3. Stores last user message in state for debugging
-    4. Tracks node transitions
-    5. Calls the actual node function
-    6. Returns the node's state update
+    2. Detects new HumanMessages and MUTATES state directly
+    3. Calls the node function
+    4. Merges node updates into state
+    5. Tracks transitions
+    6. Returns the mutated state object
     
     Future Enhancement:
     When adding memory optimization later, you can enhance this wrapper to:
@@ -50,45 +51,51 @@ def create_node_wrapper(node_func, node_name: str):
         print(f"\n{'='*60}")
         print(f"🔄 TRANSITION TO: {node_name}")
         print(f"{'='*60}")
+        print(f"📊 Messages count: {len(state.get('messages', []))}")
         
-        # Capture old state to detect new messages
+        # CAPTURE OLD STATE
+        old_state = state.get("current_state")
         old_last_user_msg = state.get("last_user_msg")
+        
+        # DETECT AND STORE NEW USER MESSAGE (mutate state directly)
+        print(old_last_user_msg)
         messages = state.get("messages", [])
+        print(messages)
+        if messages and isinstance(messages[-1], HumanMessage):
+            text = messages[-1].content or ""
+            if text and text != old_last_user_msg:
+                print(f"🆕 NEW USER MESSAGE DETECTED:")
+                print(f"   Old: {old_last_user_msg[:50] if old_last_user_msg else 'None'}...")
+                print(f"   New: {text[:50]}...")
+                state["last_user_msg"] = text  # ✅ MUTATE state directly
+            else:
+                print("ℹ️ No change in last_user_msg")
+        else:
+            print("ℹ️ Last message is not HumanMessage")
         
-        # Find the last HumanMessage in current state
-        current_last_human_msg = None
-        for msg in reversed(messages):
-            if hasattr(msg, '__class__') and msg.__class__.__name__ == 'HumanMessage':
-                current_last_human_msg = msg.content
-                break
-        
-        # Detect if there's a NEW human message (after interrupt resume)
-        if current_last_human_msg and current_last_human_msg != old_last_user_msg:
-            print(f"🆕 NEW USER MESSAGE DETECTED:")
-            print(f"   Old: {old_last_user_msg[:50] if old_last_user_msg else 'None'}...")
-            print(f"   New: {current_last_human_msg[:50]}...")
-        
-        # Track transition
-        transitions = state.get("node_transitions", [])
-        transitions.append({
-            "timestamp": datetime.now().isoformat(),
-            "to_node": node_name,
-            "message_index": len(messages),
-            "last_user_msg": current_last_human_msg[:50] if current_last_human_msg else None
-        })
-        
-        # Call the actual node
+        # CALL THE NODE FUNCTION
         node_update = node_func(state)
         
-        # Ensure transition list is in the update if node doesn't include it
-        if "node_transitions" not in node_update:
-            node_update["node_transitions"] = transitions
+        # MERGE NODE UPDATE INTO STATE (reference pattern)
+        state.update(node_update)
         
-        # Store the last user message for debugging and node access
-        if current_last_human_msg:
-            node_update["last_user_msg"] = current_last_human_msg
+        # CAPTURE NEW STATE AFTER PROCESSING
+        new_state = state.get("current_state")
+        final_message_count = len(state.get("messages", []))
         
-        return node_update
+        # TRACK TRANSITION IF STATE CHANGED
+        if old_state != new_state and old_state is not None:
+            transitions = state.setdefault("node_transitions", [])
+            transitions.append({
+                "from_node": old_state,
+                "to_node": new_state,
+                "transition_after_message_index": final_message_count,
+                "timestamp": datetime.now().isoformat()
+            })
+            print(f"🔄 NODE TRANSITION: {old_state} -> {new_state} after message {final_message_count}")
+        
+        # RETURN THE MUTATED STATE OBJECT (reference pattern)
+        return state
     
     return wrapped_node
 

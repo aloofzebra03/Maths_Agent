@@ -285,6 +285,7 @@ def _coach_logic(state: MathAgentState) -> Dict[str, Any]:
     """
     print("\n🏆 COACH MODE")
     
+    
     messages = state.get("messages", [])
     problem = state["problem"]
     nudge_count = state.get("nudge_count", 0)
