@@ -69,7 +69,9 @@ def start_node(state: MathAgentState) -> Dict[str, Any]:
     print("🚀 START NODE")
     print("="*60)
     
+    state['problem_id'] = 'add_frac_same_den_01'
     problem_id = state.get("problem_id")
+    # print(f"📚 Loading problem ID: {problem_id}")
     if not problem_id:
         raise ValueError("No problem_id provided in initial state")
     
@@ -102,6 +104,7 @@ def start_node(state: MathAgentState) -> Dict[str, Any]:
     
     return {
         "problem": question,
+        "problem_id": problem_id,
         "steps": steps,
         "max_steps": len(steps),
         "step_index": 0,
@@ -163,6 +166,7 @@ def assess_student_response(state: MathAgentState) -> Dict[str, Any]:
     
     # Load problem data to get required concepts
     problem_id = state.get("problem_id")
+    print(f"📚 Loading problem data for ID: {problem_id}")
     problem_data = load_problem_from_json(problem_id)
     required_concepts = format_required_concepts(problem_data.get("required_concepts", []))
     

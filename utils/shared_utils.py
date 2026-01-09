@@ -11,6 +11,9 @@ import re
 from typing import List, Optional, Dict, Any
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+import dotenv
+dotenv.load_dotenv(dotenv_path=".env", override=True)
+
 
 # Import tracker utilities for API key management
 try:
@@ -84,7 +87,7 @@ def extract_json_block(text: str) -> str:
 # LLM Utilities
 # ============================================================================
 
-def get_llm(api_key: Optional[str] = None, model: str = "gemini-2.0-flash-exp") -> ChatGoogleGenerativeAI:
+def get_llm(api_key: Optional[str] = None, model: str = "gemma-3-27b-it") -> ChatGoogleGenerativeAI:
     """
     Get configured LLM instance with specified API key and model.
     
@@ -96,7 +99,7 @@ def get_llm(api_key: Optional[str] = None, model: str = "gemini-2.0-flash-exp") 
         Configured ChatGoogleGenerativeAI instance
     """
     if api_key is None:
-        api_key = os.getenv("GOOGLE_API_KEY")
+        api_key = os.getenv("GOOGLE_API_KEY_1")
         if not api_key:
             raise ValueError("No API key provided and GOOGLE_API_KEY not found in environment")
     
@@ -143,7 +146,7 @@ def invoke_llm_with_fallback(messages: List, operation_name: str = "LLM call"):
         llm = get_llm(api_key=selected_api_key, model=selected_model)
     else:
         # Fallback to environment variable
-        selected_model = "gemini-2.0-flash-exp"
+        selected_model = "gemma-3-27b-it"
         print(f"🔑 Using default API key from environment for model: {selected_model}")
         llm = get_llm(model=selected_model)
     
@@ -296,26 +299,14 @@ def build_messages_with_history(
     messages = []
     
     # Add system message with core instruction
-    messages.append(SystemMessage(content=system_prompt))
     
     # Add recent conversation history from state
     conversation_history = state.get("messages", [])
-    
-    # Take last N messages to avoid context overflow
-    # Skip the initial __start__ placeholder if present
-    recent_messages = []
-    for msg in conversation_history[-max_history_messages:]:
-        # Skip placeholder messages
-        if isinstance(msg, HumanMessage) and msg.content == "__start__":
-            continue
-        # Skip system messages from history (we have one at the top)
-        if isinstance(msg, SystemMessage):
-            continue
-        recent_messages.append(msg)
-    
-    # Add recent conversation to context
-    messages.extend(recent_messages)
-    
+
+    messages.extend(conversation_history)
+
+    messages.append(SystemMessage(content=system_prompt))
+
     # Add new user instruction
     messages.append(HumanMessage(content=user_prompt))
     
@@ -323,6 +314,6 @@ def build_messages_with_history(
     if format_instructions:
         messages.append(HumanMessage(content=f"\n\n{format_instructions}"))
     
-    print(f"📊 Built message list: 1 system + {len(recent_messages)} history + 1 instruction + {1 if format_instructions else 0} format")
+    print(f"📊 Built message list: 1 system + {len(conversation_history)} history + 1 instruction + {1 if format_instructions else 0} format")
     
     return messages
