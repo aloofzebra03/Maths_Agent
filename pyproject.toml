@@ -1,0 +1,41 @@
+[project]
+name = "agentic-ai-for-education"
+version = "0.0.1"
+description = "Educational agent with LangGraph, RAG, and Streamlit UI"
+requires-python = ">=3.10"
+
+# --- Core deps needed to run your agent + Studio ---
+dependencies = [
+  "langgraph>=0.2.30",
+  "langgraph-cli>=0.2.30",
+  "langchain>=0.2.7",
+  "langchain-google-genai>=2.0.0",
+  "python-dotenv>=1.0.1",
+  # If you use LangSmith traces:
+  "langsmith>=0.1.85",
+]
+
+# Optional groups (install only if you need them)
+[project.optional-dependencies]
+ui = [
+  "streamlit>=1.36.0",
+  "scipy>=1.11.0",
+  "numpy>=1.24.0",
+  "soundfile>=0.12.1",
+  "pedalboard>=0.9.12",
+  "gTTS>=2.5.0",
+  "audio-recorder-streamlit>=0.0.8",
+  # If you really need this sqlite shim (usually not needed for Studio):
+  "pysqlite3-binary>=0.5.2.post3",
+  # Your ASR loader — if this is a local module, remove this line.
+  # Replace with the actual package name or comment it out if you vendor it.
+  # "onnx_asr>=0.1.0",
+]
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+# Ensure both your package and the studio app are importable
+include = ["concept_map_poc","api_tracker_utils","utils","Streamlit_UI","educational_agent_v1","tester_agent","educational_agent_with_simulation","educational_agent_optimized","educational_agent_optimized_langsmith","educational_agent_optimized_langsmith_kannada","api_servers","NCERT","educational_agent_optimized_langsmith_autosuggestion","educational_agent_math_tutor"]

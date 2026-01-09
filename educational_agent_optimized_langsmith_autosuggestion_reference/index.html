@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Pendulum Guided Simulation Tutor</title>
+<style>
+:root {
+--creme-bg: #f8f6ff;
+--creme-card: #f3edfc;
+--creme-light: #f7ede2;
+--creme-dark: #e9dccb;
+--purple-main: #7c3aed;
+--purple-dark: #5b21b6;
+--purple-light: #ede9fe;
+--text-main: #2d1e2f;
+--text-muted: #826dad;
+--border-radius: 15px;
+}
+body {
+margin: 0;
+padding: 0;
+background: radial-gradient(circle at 40% 20%, #e6dcfc 0px, var(--creme-bg) 410px);
+font-family: 'Segoe UI', 'Inter', sans-serif;
+color: var(--text-main);
+}
+.wrapper {
+max-width: 700px;
+margin: 38px auto 38px auto;
+background: var(--creme-card);
+padding: 38px 30px 48px 30px;
+border-radius: var(--border-radius);
+box-shadow: 0 6px 28px rgba(124,58,237,0.11);
+display: flex;
+flex-direction: column;
+align-items: center;
+}
+h1 {
+font-size: 29px;
+color: var(--purple-main);
+margin-bottom: 15px;
+font-weight: 800;
+letter-spacing: 0.6px;
+}
+.agent-block {
+width: 100%;
+background: var(--purple-light);
+border-radius: var(--border-radius);
+padding: 17px 19px 12px 23px;
+margin-bottom: 12px;
+font-size: 16px;
+line-height: 1.68;
+color: var(--text-main);
+box-shadow: 0 1px 8px rgba(124,58,237,0.07);
+position: relative;
+border-left: 5px solid var(--purple-main);
+margin-top: 3px;
+}
+.agent1 { background: #efeafa; border-left: 5px solid #b884e3; }
+.agent2 { background: #e7e1f7; border-left: 5px solid #7c3aed; }
+.agent-label {
+position: absolute;
+top: -11px;
+left: 10px;
+background: #7c3aed;
+color: #fff;
+padding: 2px 9px 2px 9px;
+border-radius: 7px;
+font-size: 13px;
+font-weight: 600;
+letter-spacing: 0.5px;
+}
+.current-block { box-shadow: 0 0 0 3px #dcd5f7; }
+.demo-block {
+background: #f0f6ff;
+border: 2px solid #c4afe9;
+border-radius: var(--border-radius);
+padding: 19px 10px 18px 10px;
+margin: 20px 0 13px 0;
+text-align: center;
+box-shadow: 0 2px 16px rgba(124,58,237,0.05);
+position: relative;
+}
+.demo-controls {
+margin: 10px 0 5px 0;
+display: flex; justify-content: center; gap: 16px;
+}
+.demo-controls label {
+display: flex; flex-direction: column; color: var(--text-muted);font-weight: 500; align-items: flex-start; font-size:15px;}
+.demo-controls input {
+padding: 6px 9px;
+border-radius: 6px;
+border: 1.2px solid var(--purple-light);
+font-size: 15px;
+background: var(--creme-light);
+color: var(--text-main);
+width: 70px;
+}
+input.step-input {
+margin-top: 8px;
+width: 94%;
+border-radius: 7px;
+border: 1.7px solid var(--purple-light);
+padding: 9px 12px;
+font-size: 16px;
+background: var(--creme-bg);
+color: var(--text-main);
+margin-bottom: 5px;
+}
+button {
+padding: 12px 22px;
+font-size: 17px;
+background-color: var(--purple-main);
+color: white;
+border: none;
+border-radius: 8px;
+cursor: pointer;
+margin: 15px 0 0 0;
+font-weight: 700;
+transition: background 0.2s;
+letter-spacing:0.3px;
+box-shadow: 0 1px 8px rgba(124,58,237,0.07);
+}
+button:disabled {
+background: #cdbbfb;
+cursor: not-allowed;
+}
+button:hover:not(:disabled) {
+background-color: var(--purple-dark);
+}
+.step-ind {
+display: inline-block;
+background: #7c3aed;
+color: #fff;
+padding: 1px 10px;
+border-radius: 17px;
+font-size: 13px;
+margin-right: 8px;
+font-weight: 700;
+letter-spacing:0.3px;
+margin-bottom:4px;
+}
+#test-demo {
+margin-top: 25px;
+}
+#test-controls {
+display: flex;
+gap: 13px;
+justify-content: center;
+margin-top: 12px;
+}
+#test-controls label {
+display: flex;flex-direction: column;color: var(--text-muted);font-weight: 500;align-items: flex-start;}
+#test-controls input {
+padding: 6px 9px;
+border-radius: 6px;
+border: 1.2px solid var(--purple-light);
+font-size: 15px;
+background: var(--creme-light);
+color: var(--text-main);
+width: 66px;
+}
+@media (max-width: 750px){.wrapper{max-width:99vw;padding:5vw 1vw;} .demo-block canvas{width:97vw;}}
+</style>
+</head>
+<body>
+<div class="wrapper">
+  <h1>Pendulum Interactive Concepts</h1>
+  <div id="guided-flow"></div>
+</div>
+<script>
+// Pre-defined educational content to replace LLM calls
+const educationalContent = {
+  concepts: [
+    "Effect of pendulum length on period",
+    "Impact of amplitude on period", 
+    "Role of gravity on swing time"
+  ],
+  responses: {
+    0: { // Concept 1: Length effect
+      variables: "The main variables are pendulum length (variable) and gravity (constant). Mass doesn't affect the period in simple pendulum motion.",
+      action: "Change the pendulum length from short to long while keeping gravity and amplitude constant to see how period changes.",
+      prediction: "What do you think will happen to the swing time when you make the pendulum longer? Will it swing faster or slower?",
+      execute: "Watch how the pendulum swings with different lengths. Notice the timing of each complete back-and-forth motion.",
+      observe: "What did you notice about the swing time when you changed the length? Did it match your prediction?",
+      insight: (pred, obs) => `Length has a square root relationship with period - longer pendulums swing slower. ${pred.toLowerCase().includes('slower') || pred.toLowerCase().includes('longer') ? 'Your prediction was correct!' : 'This might differ from your prediction.'} The period increases as the square root of length.`
+    },
+    1: { // Concept 2: Amplitude effect
+      variables: "The key variables are amplitude/starting angle (variable) and length, gravity (constant). For small angles, amplitude barely affects period.",
+      action: "Change the starting amplitude from small (5°) to large (80°) while keeping length and gravity constant.",
+      prediction: "Do you think a larger starting swing angle will make the pendulum swing faster, slower, or the same speed?",
+      execute: "Compare the swing times at small vs large amplitudes. Pay attention to how the period changes with bigger starting angles.",
+      observe: "How did the swing time change when you increased the amplitude? What did you observe about the motion?",
+      insight: (pred, obs) => `For small amplitudes, period is nearly constant. For large amplitudes (>15°), the period increases slightly. ${pred.toLowerCase().includes('same') || pred.toLowerCase().includes('constant') ? 'Your prediction about small angles was right!' : 'This shows the small angle approximation in physics.'}`
+    },
+    2: { // Concept 3: Gravity effect
+      variables: "Gravity is the variable here, while length and amplitude stay constant. Lower gravity means slower restoring force.",
+      action: "Compare Earth gravity (9.81 m/s²) with Moon gravity (1.62 m/s²) using the same pendulum length and amplitude.",
+      prediction: "How do you think the swing time will change on the Moon where gravity is much weaker than on Earth?",
+      execute: "Watch the pendulum swing under different gravitational conditions. Notice how gravity affects the restoring force and timing.",
+      observe: "What difference did you see in the swing time between Earth and Moon gravity? How did the motion change?",
+      insight: (pred, obs) => `Lower gravity dramatically increases the period - the pendulum swings much slower on the Moon. ${pred.toLowerCase().includes('slow') || pred.toLowerCase().includes('longer') ? 'Your prediction was spot on!' : 'Gravity has an inverse square root relationship with period.'}`
+    }
+  }
+};
+
+function agentBlock(msg, agent, current=false) {
+  let div = document.createElement('div');
+  div.className = `agent-block agent${agent}${current?' current-block':''}`;
+  let label = document.createElement('span');
+  label.className = 'agent-label';
+  label.textContent = agent===1?'Concept Creator':'Simulation Agent';
+  div.appendChild(label);
+  let content = document.createElement('div');
+  content.innerHTML = msg;
+  div.appendChild(content);
+  return div;
+}
+
+function createPendulumSimulation(parent, params) {
+  let {length, gravity, amplitude} = params;
+  const canvas = document.createElement('canvas');
+  canvas.width = 400; canvas.height = 400;
+  canvas.style.background = '#ede9fe';
+  canvas.style.borderRadius = '12px';
+  canvas.style.marginTop = '9px';
+  const ctx = canvas.getContext('2d');
+  parent.appendChild(canvas);
+  let originX = 200, originY = 60;
+  const baseScale = 100, minLengthPx = 60, maxLengthPx = 300;
+  
+  function calculateVisualScale(l) {
+    let pixelLength = l * baseScale;
+    pixelLength = Math.max(minLengthPx, Math.min(maxLengthPx, pixelLength));
+    originX = canvas.width/2;
+    originY = pixelLength > 260 ? 30 : 60;
+    return pixelLength;
+  }
+  
+  let lengthMeters = length;
+  let lengthPixels = calculateVisualScale(lengthMeters);
+  let gravityVal = gravity;
+  let initialAngle = (amplitude * Math.PI) / 180;
+  let angle = initialAngle;
+  let aVel = 0, aAcc = 0;
+  const dt = 0.03;
+  let running = true;
+  
+  function drawPendulum() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.beginPath();
+    ctx.arc(originX, originY, 7, 0, 2 * Math.PI);
+    ctx.fillStyle = '#7c3aed';
+    ctx.fill();
+    aAcc = (-gravityVal / lengthMeters) * Math.sin(angle);
+    aVel += aAcc * dt;
+    aVel *= 0.998;
+    angle += aVel * dt;
+    if (Math.abs(aVel) < 0.00005 && Math.abs(Math.sin(angle)) > 0.999) aVel = 0;
+    const bobX = originX + lengthPixels * Math.sin(angle);
+    const bobY = originY + lengthPixels * Math.cos(angle);
+    ctx.beginPath(); ctx.moveTo(originX, originY); ctx.lineTo(bobX, bobY);
+    ctx.strokeStyle = "#7c3aed"; ctx.lineWidth = 3; ctx.stroke();
+    ctx.beginPath(); ctx.arc(bobX, bobY, 18, 0, 2*Math.PI);
+    ctx.fillStyle = "#ede9fe";
+    ctx.strokeStyle = "#7c3aed"; ctx.lineWidth = 2.5; ctx.fill(); ctx.stroke();
+  }
+  
+  function animate() {
+    if (!running) return;
+    drawPendulum();
+    requestAnimationFrame(animate);
+  }
+  animate();
+  
+  return {
+    setParams: function(p) {
+      lengthMeters = p.length;
+      gravityVal = p.gravity;
+      initialAngle = (p.amplitude*Math.PI)/180;
+      angle = initialAngle;
+      aVel = 0; aAcc = 0;
+      lengthPixels = calculateVisualScale(lengthMeters);
+      running = true;
+    },
+    getParams: function(){
+      return {length:lengthMeters, gravity:gravityVal, amplitude:Math.round(initialAngle*180/Math.PI)};
+    },
+    stop: function() { running = false; },
+    canvas
+  };
+}
+
+// Replaced LLM function with pre-defined educational content
+function getEducationalResponse(stepType, conceptIndex, prediction = '', observation = '') {
+  const content = educationalContent.responses[conceptIndex];
+  
+  switch(stepType) {
+    case 'variables':
+      return content.variables;
+    case 'action':
+      return content.action;
+    case 'prediction':
+      return content.prediction;
+    case 'execute':
+      return content.execute;
+    case 'observe':
+      return content.observe;
+    case 'insight':
+      return content.insight(prediction, observation);
+    default:
+      return 'Continue to explore the simulation!';
+  }
+}
+
+let guidedDiv = document.getElementById('guided-flow');
+let stepIdx = 0;
+let flowIdx = 0;
+let userConcepts = educationalContent.concepts;
+let userPreds = ["", "", ""];
+let userObs = ["", "", ""];
+
+function render() {
+  guidedDiv.innerHTML = '';
+  
+  if (stepIdx === 0) {
+    guidedDiv.appendChild(agentBlock(`<div style="font-size:17px;color:#5b21b6;font-weight:600;margin-bottom:2px;">Here are three key concepts you can explore:</div><ol style="margin-top:7px;margin-left:13px;"><li>${userConcepts[0]}</li><li>${userConcepts[1]}</li><li>${userConcepts[2]}</li></ol>`,1,true));
+    guidedDiv.appendChild(agentBlock(`<span class="step-ind">Step 1/3</span>Let's start with the first concept!`,2));
+    showNextBtn(()=>{stepIdx=1;flowIdx=0;render();});
+    return;
+  }
+  
+  let currConcept = userConcepts[flowIdx];
+  let subStep = (stepIdx-1)%6;
+  let stepTypes = ['variables', 'action', 'prediction', 'execute', 'observe', 'insight'];
+  let currentStepType = stepTypes[subStep];
+  
+  let predictionVal = userPreds[flowIdx] || "";
+  let observationVal = userObs[flowIdx] || "";
+  
+  let answer = getEducationalResponse(currentStepType, flowIdx, predictionVal, observationVal);
+  
+  let block = agentBlock(`<span class="step-ind">Step ${flowIdx+1}/3</span>` + answer, 2, true);
+  guidedDiv.appendChild(block);
+  
+  if (currentStepType === 'prediction') {
+    let inp = document.createElement('input');
+    inp.className = 'step-input'; 
+    inp.placeholder = 'Type your prediction...';
+    inp.autofocus = true;
+    block.appendChild(inp);
+    inp.onkeydown = function(e){if(e.key==='Enter') nextAgentNode(inp.value.trim());};
+    showNextBtn(()=>{nextAgentNode(inp.value.trim());});
+    return;
+  }
+  
+  if (currentStepType === 'observe') {
+    let inp = document.createElement('input');
+    inp.className = 'step-input'; 
+    inp.placeholder = 'Your observation...';
+    inp.autofocus = true;
+    block.appendChild(inp);
+    inp.onkeydown = function(e){if(e.key==='Enter') nextAgentNode(undefined, inp.value.trim());};
+    showNextBtn(()=>{nextAgentNode(undefined, inp.value.trim());});
+    return;
+  }
+  
+  if (currentStepType === 'execute') {
+    let demoBlock = document.createElement('div');
+    demoBlock.className = 'demo-block';
+    let currIdx = 0;
+    
+    // Different parameter sets for each concept
+    let paramSets = [
+      [{length:0.5,gravity:9.81,amplitude:10},{length:2.0,gravity:9.81,amplitude:10}], // Length effect
+      [{length:1,gravity:9.81,amplitude:5},{length:1,gravity:9.81,amplitude:60}],      // Amplitude effect  
+      [{length:1,gravity:9.81,amplitude:30},{length:1,gravity:1.62,amplitude:30}]      // Gravity effect
+    ];
+    
+    let paramSet = paramSets[flowIdx];
+    let currParams = Object.assign({}, paramSet[0]);
+    
+    let getPeriod = () => 2*Math.PI*Math.sqrt(currParams.length/currParams.gravity);
+    let periodText = document.createElement('div');
+    periodText.style.fontSize = '15px';
+    periodText.style.color = '#5b21b6';
+    periodText.style.marginTop = '5px';
+    
+    function renderPeriod() {
+      periodText.innerHTML = `Period T ≈ <b>${getPeriod().toFixed(2)}</b> s`;
+    }
+    renderPeriod();
+    demoBlock.appendChild(periodText);
+    
+    let phold = document.createElement('div');
+    demoBlock.appendChild(phold);
+    let sim = createPendulumSimulation(phold, currParams);
+    
+    let controls = document.createElement('div');
+    controls.className = 'demo-controls';
+    controls.innerHTML = `
+      <label>Length (m)<input id="demo-length" type="number" min="0.1" step="0.05" value="${currParams.length}"/></label>
+      <label>Gravity (m/s²)<input id="demo-gravity" type="number" min="0.1" step="0.05" value="${currParams.gravity}"/></label>
+      <label>Amplitude (°)<input id="demo-ampl" type="number" min="1" max="90" step="1" value="${currParams.amplitude}"/></label>
+    `;
+    demoBlock.appendChild(controls);
+    
+    controls.querySelectorAll('input').forEach(inp=>{
+      inp.oninput = function(){
+        currParams.length = parseFloat(document.getElementById('demo-length').value);
+        currParams.gravity = parseFloat(document.getElementById('demo-gravity').value);
+        currParams.amplitude = parseFloat(document.getElementById('demo-ampl').value);
+        sim.setParams({...currParams});
+        renderPeriod();
+      };
+    });
+    
+    let nextDemoBtn = document.createElement('button');
+    nextDemoBtn.textContent = 'Try suggested comparison';
+    nextDemoBtn.onclick = function() {
+      if (currIdx === 0 && paramSet.length>1) {
+        currIdx = 1;
+        currParams = Object.assign({}, paramSet[1]);
+        document.getElementById('demo-length').value = currParams.length;
+        document.getElementById('demo-gravity').value = currParams.gravity;
+        document.getElementById('demo-ampl').value = currParams.amplitude;
+        sim.setParams(currParams);
+        renderPeriod();
+        nextDemoBtn.textContent = 'Continue to next step';
+      } else {
+        nextAgentNode();
+      }
+    };
+    demoBlock.appendChild(nextDemoBtn);
+    guidedDiv.appendChild(demoBlock);
+    scrollToBottom();
+    return;
+  }
+  
+  showNextBtn(nextAgentNode);
+}
+
+function nextAgentNode(predictionInput, observationInput) {
+  let subStep = (stepIdx-1)%6;
+  
+  if (typeof predictionInput === "string" && predictionInput!==undefined) {
+    userPreds[flowIdx] = predictionInput;
+  }
+  if (typeof observationInput === "string" && observationInput!==undefined) {
+    userObs[flowIdx] = observationInput;
+  }
+  
+  if (subStep === 5) {
+    flowIdx++;
+    if (flowIdx >= 3) {
+      renderSummary();
+      return;
+    } else {
+      stepIdx = 1 + flowIdx*6;
+    }
+  } else {
+    stepIdx++;
+  }
+  render();
+}
+
+function renderSummary() {
+  guidedDiv.innerHTML = '';
+  let summaryBlock = `<b>Reflection & Summary:</b><br>Thanks for your predictions and observations! Here's a quick recap:<br>`;
+  
+  for (let i=0; i<userConcepts.length; i++) {
+    summaryBlock += `<div style='margin-bottom:10px;'><b>Concept ${i+1}: ${userConcepts[i]}</b><br>Prediction: <span style='color:#5b21b6;font-weight:500'>${userPreds[i]||'—'}</span><br>Observation: <span style='color:#245;font-weight:500'>${userObs[i]||'—'}</span></div>`;
+  }
+  
+  summaryBlock += `<div style='margin-top:12px;line-height:1.6'>You've discovered that length and gravity strongly affect the pendulum's period through square root relationships, while amplitude only matters for large angles. Keep exploring these physics principles!</div>`;
+  
+  guidedDiv.appendChild(agentBlock(summaryBlock,2,true));
+  
+  let testBlock = document.createElement('div');
+  testBlock.className = 'demo-block';
+  testBlock.innerHTML = '<b>Test and explore yourself!</b> Change values below to continue learning.';
+  
+  let canDiv = document.createElement('div');
+  let initialParams = {length:1,gravity:9.81,amplitude:30};
+  let pendSim = createPendulumSimulation(canDiv, initialParams);
+  testBlock.appendChild(canDiv);
+  
+  let controls = document.createElement('div');
+  controls.id = 'test-controls';
+  controls.innerHTML = `<label>Length<br><input id="test-length" type="number" min="0.1" step="0.05" value="1"/></label>
+    <label>Gravity<br><input id="test-gravity" type="number" min="0.1" step="0.05" value="9.81"/></label>
+    <label>Amplitude<br><input id="test-ampl" type="number" min="1" max="90" step="1" value="30"/></label>`;
+  testBlock.appendChild(controls);
+  guidedDiv.appendChild(testBlock);
+  
+  controls.querySelectorAll('input').forEach(inp=>{
+    inp.oninput = function(){
+      let l = parseFloat(document.getElementById('test-length').value);
+      let g = parseFloat(document.getElementById('test-gravity').value);
+      let a = parseFloat(document.getElementById('test-ampl').value);
+      pendSim.setParams({length:l,gravity:g,amplitude:a});
+    };
+  });
+}
+
+function showNextBtn(cb) {
+  let btn = document.createElement('button');
+  btn.id = 'flow-next';
+  btn.textContent = 'Next';
+  btn.style.display = 'block';
+  btn.onclick = function(){cb&&cb();};
+  guidedDiv.appendChild(btn);
+  scrollToBottom();
+}
+
+function scrollToBottom() { 
+  setTimeout(()=>window.scrollTo({top:document.body.scrollHeight,left:0,behavior:'smooth'}),30); 
+}
+
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,125 @@
+{
+  "problem_id": "add_frac_same_den_01",
+  "topic": "Addition of Fractions (Same Denominator)",
+  "difficulty": "easy",
+
+  "question": "Add: 3/8 + 2/8",
+
+  "final_answer": "5/8",
+
+  "canonical_solution": {
+    "steps": [
+      {
+        "step_id": 1,
+        "description": "Check the denominators of both fractions.",
+        "concept": "fraction_basics"
+      },
+      {
+        "step_id": 2,
+        "description": "Since the denominators are the same, add the numerators.",
+        "concept": "addition_same_denominator"
+      },
+      {
+        "step_id": 3,
+        "description": "Add numerators: 3 + 2 = 5, keep denominator 8.",
+        "concept": "addition_same_denominator"
+      }
+    ]
+  },
+
+  "alternative_solutions": [
+    {
+      "method": "Unit parts reasoning",
+      "steps": [
+        "Both fractions represent parts of the same-sized whole",
+        "3 parts + 2 parts = 5 parts out of 8",
+        "So the sum is 5/8"
+      ]
+    },
+    {
+      "method": "Visual (unit strip) model",
+      "steps": [
+        "Draw a strip divided into 8 equal parts",
+        "Shade 3 parts, then shade 2 more parts",
+        "Total shaded parts = 5 out of 8"
+      ]
+    }
+  ],
+
+  "common_mistakes": [
+    "Adding denominators",
+    "Changing denominator unnecessarily"
+  ],
+
+  "required_concepts": ["fraction_basics", "addition_same_denominator"]
+}
+{
+  "problem_id": "add_frac_diff_den_01",
+  "topic": "Addition of Fractions (Different Denominators)",
+  "difficulty": "medium",
+
+  "question": "Add: 2/3 + 1/6",
+
+  "final_answer": "5/6",
+
+  "canonical_solution": {
+    "steps": [
+      {
+        "step_id": 1,
+        "description": "Check the denominators: 3 and 6 are different.",
+        "concept": "addition_different_denominator"
+      },
+      {
+        "step_id": 2,
+        "description": "Find a common denominator. LCM of 3 and 6 is 6.",
+        "concept": "common_denominator"
+      },
+      {
+        "step_id": 3,
+        "description": "Convert 2/3 to an equivalent fraction with denominator 6.",
+        "concept": "equivalent_fractions"
+      },
+      {
+        "step_id": 4,
+        "description": "2/3 = 4/6 and 1/6 stays the same.",
+        "concept": "equivalent_fractions"
+      },
+      {
+        "step_id": 5,
+        "description": "Add numerators: 4 + 1 = 5, keep denominator 6.",
+        "concept": "addition_same_denominator"
+      }
+    ]
+  },
+
+  "alternative_solutions": [
+    {
+      "method": "LCM-first method",
+      "steps": [
+        "Find LCM of 3 and 6",
+        "Rewrite both fractions with denominator 6",
+        "Add the numerators"
+      ]
+    },
+    {
+      "method": "Unit square / area model",
+      "steps": [
+        "Represent both fractions using sixths",
+        "Convert 2/3 into sixths",
+        "Count total shaded parts"
+      ]
+    }
+  ],
+
+  "common_mistakes": [
+    "Adding denominators directly",
+    "Forgetting to convert both fractions",
+    "Using wrong LCM"
+  ],
+
+  "required_concepts": [
+    "fraction_basics",
+    "equivalent_fractions",
+    "addition_different_denominator"
+  ]
+}

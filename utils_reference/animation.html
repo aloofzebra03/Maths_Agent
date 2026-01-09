@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Anime Lip Sync — Dual Characters</title>
+  <style>
+    body {
+      background:#111;
+      color:#eee;
+      font-family: Arial, sans-serif;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      height:100vh;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    .container { text-align: center; max-width: 600px; }
+    .stage { position:relative; display:inline-block; margin-bottom: 20px; }
+    .character { width:360px; display:block; transition: opacity 0.3s ease; }
+    .mouth-container {
+      position:absolute; left:75px; top:240px; width:209px; height:50px; pointer-events:none;
+    }
+    svg.mouth { width:100%; height:100%; }
+    .mouth-set g { opacity:0; transition:opacity 80ms ease-out; }
+    .mouth-set g.active { opacity:1; }
+    .status { margin-top:10px; text-align:center; font-size:14px; color:#bbb; }
+    .character-selector { 
+      margin: 15px 0; 
+      display: flex; 
+      justify-content: center; 
+      align-items: center; 
+      gap: 15px; 
+      flex-wrap: wrap;
+    }
+    .character-btn {
+      background: #444;
+      color: #eee;
+      border: 2px solid #666;
+      padding: 8px 16px;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-weight: bold;
+    }
+    .character-btn.active {
+      background: #0066cc;
+      border-color: #0088ff;
+      box-shadow: 0 0 10px rgba(0, 136, 255, 0.3);
+    }
+    .character-btn:hover {
+      background: #555;
+    }
+    .character-btn.active:hover {
+      background: #0077dd;
+    }
+    .voice-selector { 
+      margin: 10px 0; 
+      display: flex; 
+      justify-content: center; 
+      align-items: center; 
+      gap: 10px; 
+      flex-wrap: wrap;
+    }
+    select { 
+      background:#333; 
+      color:#eee; 
+      border:1px solid #555; 
+      padding:6px 10px; 
+      border-radius: 4px;
+      min-width: 200px;
+    }
+    .controls { 
+      margin: 15px 0; 
+      display: flex; 
+      flex-direction: column; 
+      align-items: center; 
+      gap: 10px; 
+    }
+    textarea { 
+      background: #222; 
+      color: #eee; 
+      border: 1px solid #555; 
+      padding: 8px; 
+      border-radius: 4px; 
+      resize: vertical; 
+      font-family: Arial, sans-serif;
+    }
+    button {
+      background: #0066cc;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: background 0.3s ease;
+    }
+    button:hover { background: #0077dd; }
+    button:active { background: #0055bb; }
+    .button-group { display: flex; gap: 10px; }
+    .current-character {
+      font-size: 16px;
+      color: #0088ff;
+      font-weight: bold;
+      margin: 10px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="stage">
+      <img id="characterImage" src="myphoto.png" class="character" />
+      <div class="mouth-container">
+        <svg class="mouth" viewBox="-50 -50 100 100">
+          <g class="mouth-set" id="mouthSet">
+            <g data-viseme="rest"><path d="M-26 6 q26 10 52 0" fill="#c33" stroke="#000" stroke-width="1"/></g>
+            <g data-viseme="closed"><rect x="-30" y="-6" width="60" height="12" rx="6" fill="#9b2b2b"/></g>
+            <g data-viseme="wide"><ellipse cx="0" cy="6" rx="42" ry="14" fill="#9b2b2b"/></g>
+            <g data-viseme="open"><ellipse cx="0" cy="8" rx="36" ry="22" fill="#9b2b2b"/></g>
+            <g data-viseme="round"><ellipse cx="0" cy="6" rx="22" ry="26" fill="#9b2b2b"/></g>
+            <g data-viseme="f_v">
+              <path d="M-28 6 q28 -24 56 0" fill="none" stroke="#000" stroke-width="3" />
+              <rect x="-20" y="2" width="40" height="6" rx="3" fill="#9b2b2b" />
+            </g>
+            <g data-viseme="th">
+              <rect x="-18" y="0" width="36" height="8" rx="4" fill="#9b2b2b" />
+              <rect x="-6" y="-8" width="12" height="8" rx="3" fill="#ffe8d6" />
+            </g>
+            <g data-viseme="smush"><ellipse cx="0" cy="6" rx="28" ry="12" fill="#9b2b2b"/></g>
+            <g data-viseme="kiss"><ellipse cx="0" cy="6" rx="16" ry="12" fill="#9b2b2b"/></g>
+          </g>
+        </svg>
+      </div>
+    </div>
+
+    <div class="current-character">
+      Current Character: <span id="currentCharacterName">Boy</span>
+    </div>
+
+    <div class="character-selector">
+      <button class="character-btn active" data-character="boy">👦 Boy Character</button>
+      <button class="character-btn" data-character="girl">👧 Girl Character</button>
+    </div>
+    
+    <div class="voice-selector">
+      Voice: <select id="voiceSelect"></select>
+    </div>
+
+    <div class="status">Viseme: <strong id="visemeName">rest</strong></div>
+
+    <div class="controls">
+      <textarea id="textInput" rows="3" cols="50" placeholder="Type text to speak here...">hello world this is a lip sync demo</textarea>
+      <div class="button-group">
+        <button id="playBtn">▶️ Play</button>
+        <button id="stopBtn">⏹️ Stop</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const visemeName = document.getElementById("visemeName");
+    const mouthSet = document.getElementById("mouthSet");
+    const playBtn = document.getElementById("playBtn");
+    const stopBtn = document.getElementById("stopBtn");
+    const textInput = document.getElementById("textInput");
+    const voiceSelect = document.getElementById("voiceSelect");
+    const characterImage = document.getElementById("characterImage");
+    const currentCharacterName = document.getElementById("currentCharacterName");
+    const characterBtns = document.querySelectorAll(".character-btn");
+
+    let queue = [], timer=null, playing=false, forceStop=false;
+    let utterance = null;
+    let voices = [];
+    let selectedVoice = null;
+    let currentCharacter = 'boy';
+
+    // Character data
+    const characters = {
+      boy: {
+        name: 'Boy',
+        image: 'myphoto2.png',
+        preferMale: true
+      },
+      girl: {
+        name: 'Girl', 
+        image: 'myphoto.png',
+        preferMale: false
+      }
+    };
+
+    // Character switching
+    characterBtns.forEach(btn => {
+      btn.onclick = () => {
+        const character = btn.dataset.character;
+        if (character !== currentCharacter) {
+          // Stop any current playback
+          stopPlay(true);
+          
+          // Update character
+          currentCharacter = character;
+          characterImage.src = characters[character].image;
+          currentCharacterName.textContent = characters[character].name;
+          
+          // Update button states
+          characterBtns.forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          
+          // Update voice selection for new character
+          loadVoicesForCharacter();
+        }
+      };
+    });
+
+    // Load available voices based on current character
+    function loadVoicesForCharacter() {
+      const character = characters[currentCharacter];
+      voiceSelect.innerHTML = '';
+      
+      let voicesToShow;
+      
+      if (character.preferMale) {
+        // Filter for male voices
+        const maleVoices = voices.filter(voice => {
+          const name = voice.name.toLowerCase();
+          const isMale = name.includes('male') || 
+                         name.includes('man') || 
+                         name.includes('boy') ||
+                         name.includes('david') ||
+                         name.includes('mark') ||
+                         name.includes('alex') ||
+                         name.includes('daniel') ||
+                         name.includes('james') ||
+                         name.includes('thomas') ||
+                         name.includes('richard') ||
+                         voice.name.match(/\b(He|Him|Male|Man|Boy)\b/i);
+          return isMale;
+        });
+        voicesToShow = maleVoices.length > 0 ? maleVoices : voices;
+      } else {
+        // Filter for female voices
+        const femaleVoices = voices.filter(voice => {
+          const name = voice.name.toLowerCase();
+          const isFemale = name.includes('female') || 
+                          name.includes('woman') || 
+                          name.includes('girl') ||
+                          name.includes('karen') ||
+                          name.includes('samantha') ||
+                          name.includes('victoria') ||
+                          name.includes('zira') ||
+                          name.includes('susan') ||
+                          name.includes('anna') ||
+                          name.includes('lily') ||
+                          name.includes('emma') ||
+                          name.includes('sophia') ||
+                          voice.name.match(/\b(She|Her|Female|Woman|Girl|Lady)\b/i);
+          return isFemale;
+        });
+        voicesToShow = femaleVoices.length > 0 ? femaleVoices : voices;
+      }
+      
+      voicesToShow.forEach((voice, index) => {
+        const option = document.createElement('option');
+        option.value = voices.indexOf(voice); // Use original voice index
+        option.textContent = `${voice.name} (${voice.lang})`;
+        voiceSelect.appendChild(option);
+      });
+
+      // Set default voice
+      if (voicesToShow.length > 0) {
+        selectedVoice = voicesToShow[0];
+        voiceSelect.value = voices.indexOf(voicesToShow[0]);
+      }
+    }
+
+    // Load all available voices
+    function loadVoices() {
+      voices = speechSynthesis.getVoices();
+      if (voices.length > 0) {
+        loadVoicesForCharacter();
+      }
+    }
+
+    // Handle voice selection change
+    voiceSelect.onchange = function() {
+      const voiceIndex = parseInt(this.value);
+      selectedVoice = voices[voiceIndex];
+    };
+
+    // Load voices when they become available
+    speechSynthesis.onvoiceschanged = loadVoices;
+    loadVoices(); // Initial load
+
+    function simpleG2P(text) {
+      let s = text.toLowerCase().replace(/[^a-z\s]/g, ' ');
+      const tokens = [];
+      for (let i=0;i<s.length;) {
+        if (s[i]===" ") { i++; continue }
+        const dig=s.slice(i,i+2);
+        if (['ch','sh','th','ng','ph','qu','ck','wh'].includes(dig)) { tokens.push(dig); i+=2; continue }
+        tokens.push(s[i]); i++;
+      }
+      return tokens;
+    }
+
+    function phonemeToViseme(p) {
+      if (['p','b','m'].includes(p)) return 'closed';
+      if (['a','o'].includes(p)) return 'open';
+      if (['e','i','y'].includes(p)) return 'wide';
+      if (['u','oo','w'].includes(p)) return 'round';
+      if (['f','v'].includes(p)) return 'f_v';
+      if (['th','t','d','n'].includes(p)) return 'th';
+      if (['s','z','sh','ch','j'].includes(p)) return 'smush';
+      if (['q'].includes(p)) return 'kiss';
+      return 'rest';
+    }
+
+    function estimateDur(tok) {
+      return /[aeiou]/.test(tok) ? 140 : 90;
+    }
+
+    function prepareQueue(text) {
+      const toks = simpleG2P(text);
+      const frames = toks.map(t=>({vis:phonemeToViseme(t), dur:estimateDur(t)}));
+      const comp=[];
+      for (const f of frames) {
+        const last=comp[comp.length-1];
+        if (last && last.vis===f.vis) last.dur+=f.dur;
+        else comp.push({...f});
+      }
+      return comp;
+    }
+
+    function setViseme(v) {
+      mouthSet.querySelectorAll("[data-viseme]").forEach(g=>g.classList.remove("active"));
+      const el=mouthSet.querySelector(`[data-viseme="${v}"]`);
+      if (el) el.classList.add("active");
+      visemeName.innerText=v;
+    }
+
+    function stepQueue() {
+      if (!playing || forceStop) return;
+      if (queue.length===0) { setViseme("rest"); playing=false; return }
+      const frame=queue.shift();
+      setViseme(frame.vis);
+      timer=setTimeout(stepQueue, frame.dur);
+    }
+
+    function playText(text) {
+      if (!text.trim()) return;
+      
+      stopPlay();
+      utterance = new SpeechSynthesisUtterance(text);
+      
+      // Set voice properties based on character
+      if (selectedVoice) {
+        utterance.voice = selectedVoice;
+      }
+      utterance.rate = 1;
+      
+      // Adjust pitch based on character
+      if (currentCharacter === 'girl') {
+        utterance.pitch = 1.2; // Higher pitch for girl
+      } else {
+        utterance.pitch = 0.9; // Slightly lower pitch for boy
+      }
+      utterance.volume = 1;
+
+      utterance.onstart = () => {
+        queue = prepareQueue(text);
+        if (queue.length > 0) {
+          playing = true;
+          forceStop = false;
+          stepQueue();
+        }
+      };
+
+      utterance.onend = () => {
+        stopPlay(true); // force stop at end of audio
+      };
+
+      utterance.onerror = () => {
+        stopPlay(true);
+      };
+
+      speechSynthesis.speak(utterance);
+    }
+
+    function stopPlay(hard=false) {
+      playing = false;
+      forceStop = hard || false;
+      queue = [];
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+      setViseme("rest");
+      if (utterance) {
+        speechSynthesis.cancel();
+        utterance = null;
+      }
+    }
+
+    // Event listeners
+    playBtn.onclick = () => playText(textInput.value);
+    stopBtn.onclick = () => stopPlay(true);
+
+    // Allow Enter key to play (Shift+Enter for new line)
+    textInput.onkeydown = (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        playText(textInput.value);
+      }
+    };
+
+    // Initialize
+    setViseme("rest");
+  </script>
+</body>
+</html>
