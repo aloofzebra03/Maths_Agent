@@ -76,7 +76,6 @@ class MathAgentState(TypedDict, total=False):
     # Message tracking
     messages: Annotated[List[AnyMessage], add_messages]
     current_state: str
-    adaptive_solver_mode: Optional[str]
     last_user_msg: Optional[str]
     agent_output: Optional[str]
     node_transitions: List[Dict[str, Any]]  # {timestamp, to_node, message_index}

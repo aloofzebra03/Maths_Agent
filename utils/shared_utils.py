@@ -151,6 +151,7 @@ def invoke_llm_with_fallback(messages: List, operation_name: str = "LLM call"):
         llm = get_llm(model=selected_model)
     
     try:
+        print(f"▶️ Invoking LLM for operation: {operation_name} with messages: {messages}")
         response = llm.invoke(messages)
         print(f"✅ {operation_name} - Success with model: {selected_model}")
         return response
