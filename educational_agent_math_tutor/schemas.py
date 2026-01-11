@@ -8,8 +8,8 @@ from langchain_core.messages import AnyMessage
 from langgraph.graph import add_messages
 
 
-# Type alias for pedagogical modes
-Mode = Literal["coach", "guided", "scaffold", "concept"]
+# Type alias for pedagogical modes (concept is now a standalone node, not a mode)
+Mode = Literal["coach", "guided", "scaffold"]
 
 
 class MathAgentState(TypedDict, total=False):
@@ -68,10 +68,17 @@ class MathAgentState(TypedDict, total=False):
     current_step_description: Optional[str]
     
     # Pedagogical context
-    missing_concept: Optional[str]
+    missing_concept: Optional[str]  # DEPRECATED: use missing_concepts instead
     previous_mode: Optional[Mode]
     nudge_count: int
     scaffold_retry_count: int
+    
+    # Concept teaching (new)
+    missing_concepts: List[str]  # Concepts student doesn't know yet
+    concepts_taught: List[str]  # Concepts already taught
+    concept_visit_count: Dict[str, int]  # Track visits per concept {"denominator": 1}
+    concept_interaction_count: int  # Interactions in current concept session
+    post_concept_reassessment: bool  # Flag: have we re-asked after teaching?
     
     # Message tracking
     messages: Annotated[List[AnyMessage], add_messages]
@@ -229,3 +236,49 @@ class ReflectionResponse(BaseModel):
     next_action_suggestions: List[str] = Field(
         description="List of suggested next actions (e.g., 'Try a similar problem', 'Practice with different numbers', 'Learn a new concept')"
     )
+
+
+class ConceptCheckResponse(BaseModel):
+    """
+    Response for checking if student knows required concepts.
+    Used in initial ASSESSMENT to determine which concepts to teach.
+    """
+    
+    missing_concepts: List[str] = Field(
+        description="List of required concepts the student doesn't understand yet. Return empty list if all concepts are understood."
+    )
+    
+    reasoning: str = Field(
+        description="Brief explanation of which concepts are missing and why, based on student's response"
+    )
+
+
+class ApproachAssessmentResponse(BaseModel):
+    """
+    Response for assessing approach quality after concept teaching (or if no concepts missing).
+    Scores Tu (understanding) and Ta (approach) to determine pedagogical mode.
+    """
+    
+    Tu: float = Field(
+        description="Understanding score (0-1). Criteria: identifies operation needed, understands problem terms/meaning, knows what result represents",
+        ge=0.0,
+        le=1.0
+    )
+    
+    Ta: float = Field(
+        description="Approach score (0-1). Criteria: mentions correct method, logical step order, handles conversion/edge cases",
+        ge=0.0,
+        le=1.0
+    )
+    
+    reasoning: str = Field(
+        description="Brief explanation of the scores and what the student understands vs. struggles with"
+    )
+    
+    @field_validator('Tu', 'Ta')
+    @classmethod
+    def validate_score_range(cls, v: float) -> float:
+        """Ensure scores are between 0 and 1."""
+        if not 0.0 <= v <= 1.0:
+            raise ValueError(f"Score must be between 0 and 1, got {v}")
+        return v

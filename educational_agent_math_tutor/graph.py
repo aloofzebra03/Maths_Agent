@@ -14,6 +14,9 @@ from educational_agent_math_tutor.schemas import MathAgentState
 from educational_agent_math_tutor.nodes import (
     start_node,
     assess_student_response,
+    concept_node,
+    re_ask_start_questions_node,
+    assess_approach_node,
     adaptive_solver,
     reflection_node,
 )
@@ -104,19 +107,49 @@ def create_node_wrapper(node_func, node_name: str):
 # Routing Functions
 # ============================================================================
 
-def should_continue_solving(state: MathAgentState) -> Literal["reflection", "adaptive_solver"]:
+def route_after_initial_assessment(state: MathAgentState) -> Literal["concept", "assess_approach"]:
+    """
+    Route from ASSESSMENT based on whether student knows required concepts.
+    
+    Returns:
+        "concept" if missing_concepts detected, else "assess_approach"
+    """
+    missing_concepts = state.get("missing_concepts", [])
+    
+    if missing_concepts:
+        print(f"📚 Concepts missing: {missing_concepts}. Routing to CONCEPT node")
+        return "concept"
+    else:
+        print("✅ All concepts understood. Routing to ASSESS_APPROACH")
+        return "assess_approach"
+
+
+def route_after_concept(state: MathAgentState) -> Literal["re_ask"]:
+    """
+    Route from CONCEPT node.
+    
+    In Option 2 (simplified flow), we always go to RE_ASK after teaching concepts.
+    
+    Returns:
+        "re_ask" - always re-ask START questions after concept teaching
+    """
+    print("✅ Concepts taught. Routing to RE_ASK to give student another try")
+    return "re_ask"
+
+
+def should_continue_solving(state: MathAgentState) -> Literal["reflection", "assess_approach"]:
     """
     Route from ADAPTIVE_SOLVER based on whether problem is solved.
     
     Returns:
-        "reflection" if solved=True, else "adaptive_solver" (which routes to ASSESSMENT)
+        "reflection" if solved=True, else "assess_approach" (to check progress)
     """
     if state.get("solved", False):
         print("✅ Problem solved! Routing to REFLECTION")
         return "reflection"
     else:
-        print("🔄 Problem not yet solved, routing back to ASSESSMENT for next student response")
-        return "adaptive_solver"
+        print("🔄 Problem not yet solved, routing to ASSESS_APPROACH to check progress")
+        return "assess_approach"
 
 
 # ============================================================================
@@ -127,13 +160,24 @@ def create_graph():
     """
     Create and compile the Math Tutoring Agent graph.
     
-    Graph Flow:
-        START → ASSESSMENT → ADAPTIVE_SOLVER → (loop or REFLECTION) → END
+    Graph Flow (Option 2 - Simplified):
+        START → ASSESSMENT → [concept check]
+                  ↓
+        [Missing concepts?]
+                  ↓ YES                    ↓ NO
+              CONCEPT                  ASSESS_APPROACH
+                  ↓                          ↓
+              RE_ASK ──────────────────────→│
+                  ↓
+          ASSESS_APPROACH → ADAPTIVE_SOLVER → [loop or REFLECTION] → END
     
     Nodes:
-        - START: Load problem and greet student
-        - ASSESSMENT: Evaluate Tu/Ta, detect missing concepts, route to mode
-        - ADAPTIVE_SOLVER: Execute mode-specific pedagogy (coach/guided/scaffold/concept)
+        - START: Load problem and greet student with initial questions
+        - ASSESSMENT: Check if student knows required concepts
+        - CONCEPT: Teach missing concepts (standalone node, not a mode)
+        - RE_ASK: Re-ask START questions after teaching concepts
+        - ASSESS_APPROACH: Score Tu/Ta and route to pedagogical mode
+        - ADAPTIVE_SOLVER: Execute mode-specific pedagogy (coach/guided/scaffold)
         - REFLECTION: Celebrate success and suggest next steps
     
     Returns:
@@ -143,9 +187,12 @@ def create_graph():
     # Create the graph
     workflow = StateGraph(MathAgentState)
     
-    # Add wrapped nodes (for future transition tracking enhancement)
+    # Add wrapped nodes
     workflow.add_node("START", create_node_wrapper(start_node, "START"))
     workflow.add_node("ASSESSMENT", create_node_wrapper(assess_student_response, "ASSESSMENT"))
+    workflow.add_node("CONCEPT", create_node_wrapper(concept_node, "CONCEPT"))
+    workflow.add_node("RE_ASK", create_node_wrapper(re_ask_start_questions_node, "RE_ASK"))
+    workflow.add_node("ASSESS_APPROACH", create_node_wrapper(assess_approach_node, "ASSESS_APPROACH"))
     workflow.add_node("ADAPTIVE_SOLVER", create_node_wrapper(adaptive_solver, "ADAPTIVE_SOLVER"))
     workflow.add_node("REFLECTION", create_node_wrapper(reflection_node, "REFLECTION"))
     
@@ -153,25 +200,48 @@ def create_graph():
     workflow.set_entry_point("START")
     
     # START → ASSESSMENT
-    # Note: Graph will interrupt after START, wait for student response,
-    # then continue to ASSESSMENT on next invoke
+    # Graph will interrupt after START, wait for student response, then continue to ASSESSMENT
     workflow.add_edge("START", "ASSESSMENT")
     
-    # ASSESSMENT → ADAPTIVE_SOLVER (always)
-    # (Mode routing happens internally in ADAPTIVE_SOLVER based on state["mode"])
-    workflow.add_edge("ASSESSMENT", "ADAPTIVE_SOLVER")
+    # ASSESSMENT → conditional (CONCEPT or ASSESS_APPROACH)
+    # Based on whether student knows required concepts
+    workflow.add_conditional_edges(
+        "ASSESSMENT",
+        route_after_initial_assessment,
+        {
+            "concept": "CONCEPT",
+            "assess_approach": "ASSESS_APPROACH"
+        }
+    )
+    
+    # CONCEPT → RE_ASK (always)
+    # After teaching concepts, re-ask the START questions
+    workflow.add_conditional_edges(
+        "CONCEPT",
+        route_after_concept,
+        {
+            "re_ask": "RE_ASK"
+        }
+    )
+    
+    # RE_ASK → ASSESS_APPROACH (always)
+    # After re-asking, assess the student's new response
+    workflow.add_edge("RE_ASK", "ASSESS_APPROACH")
+    
+    # ASSESS_APPROACH → ADAPTIVE_SOLVER (always)
+    # After scoring Tu/Ta, route to appropriate mode
+    workflow.add_edge("ASSESS_APPROACH", "ADAPTIVE_SOLVER")
     
     # ADAPTIVE_SOLVER → conditional routing
-    # Note: Graph will interrupt after ADAPTIVE_SOLVER, wait for student response,
-    # then continue based on whether problem is solved
+    # Graph will interrupt after ADAPTIVE_SOLVER for student response
     # - If solved: go to REFLECTION
-    # - Else: loop back to ASSESSMENT (to evaluate new student response)
+    # - Else: loop back to ASSESS_APPROACH
     workflow.add_conditional_edges(
         "ADAPTIVE_SOLVER",
         should_continue_solving,
         {
             "reflection": "REFLECTION",
-            "adaptive_solver": "ASSESSMENT"  # Loop back to ASSESSMENT, not ADAPTIVE_SOLVER
+            "assess_approach": "ASSESS_APPROACH"
         }
     )
     
@@ -183,11 +253,11 @@ def create_graph():
     
     graph = workflow.compile(
         # checkpointer=checkpointer,
-        interrupt_after=["START", "ADAPTIVE_SOLVER"]  # Pause for student input after these nodes
+        interrupt_after=["START", "ADAPTIVE_SOLVER", "RE_ASK", "CONCEPT"]  # Pause for student input
     )
     
-    print("✅ Graph compiled successfully with MemorySaver checkpointer")
-    print("🔄 Human-in-the-loop enabled: graph will pause after START and ADAPTIVE_SOLVER")
+    print("✅ Graph compiled successfully")
+    print("🔄 Human-in-the-loop enabled at: START, CONCEPT, RE_ASK, ADAPTIVE_SOLVER")
     
     return graph
 

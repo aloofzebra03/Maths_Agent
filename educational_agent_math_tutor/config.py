@@ -30,6 +30,12 @@ MAX_SCAFFOLD_RETRIES = 2
 # Maximum total steps expected (used for validation)
 MAX_TOTAL_STEPS = 20
 
+# Maximum times we can teach the same concept to a student
+MAX_CONCEPT_VISITS_PER_CONCEPT = 2
+
+# Maximum interactions allowed per concept teaching session
+MAX_CONCEPT_INTERACTIONS = 3
+
 
 # ============================================================================
 # LLM Configuration

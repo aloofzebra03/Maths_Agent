@@ -18,6 +18,8 @@ from educational_agent_math_tutor.schemas import (
     ScaffoldResponse,
     ConceptResponse,
     ReflectionResponse,
+    ConceptCheckResponse,
+    ApproachAssessmentResponse,
 )
 from educational_agent_math_tutor.prompts import (
     START_SYSTEM_PROMPT,
@@ -34,12 +36,20 @@ from educational_agent_math_tutor.prompts import (
     CONCEPT_USER_TEMPLATE,
     REFLECTION_SYSTEM_PROMPT,
     REFLECTION_USER_TEMPLATE,
+    CONCEPT_CHECK_SYSTEM_PROMPT,
+    CONCEPT_CHECK_USER_TEMPLATE,
+    RE_ASK_SYSTEM_PROMPT,
+    RE_ASK_USER_TEMPLATE,
+    APPROACH_ASSESSMENT_SYSTEM_PROMPT,
+    APPROACH_ASSESSMENT_USER_TEMPLATE,
 )
 from educational_agent_math_tutor.config import (
     TA_THRESHOLD_HIGH,
     TU_THRESHOLD_HIGH,
     MAX_COACH_NUDGES,
     MAX_SCAFFOLD_RETRIES,
+    MAX_CONCEPT_VISITS_PER_CONCEPT,
+    MAX_CONCEPT_INTERACTIONS,
 )
 from utils.shared_utils import (
     invoke_llm_with_fallback,
@@ -116,6 +126,12 @@ def start_node(state: MathAgentState) -> Dict[str, Any]:
         "node_transitions": [],
         "messages": messages,
         "current_state": "START",
+        # New concept tracking fields
+        "missing_concepts": [],
+        "concepts_taught": [],
+        "concept_visit_count": {},
+        "concept_interaction_count": 0,
+        "post_concept_reassessment": False,
     }
 
 
@@ -125,24 +141,20 @@ def start_node(state: MathAgentState) -> Dict[str, Any]:
 
 def assess_student_response(state: MathAgentState) -> Dict[str, Any]:
     """
-    ASSESSMENT node: Evaluate student's understanding (Tu) and approach (Ta).
+    ASSESSMENT node: Check if student knows required prerequisite concepts.
     
-    Uses LLM-as-grader with rubric to score:
-    - Tu: Understanding of problem (0-1)
-    - Ta: Quality of approach (0-1)
-    - missing_concept: Detected prerequisite gap (if any)
+    This is the initial assessment that determines if we need to teach
+    concepts before proceeding to solve the problem.
     
-    Routes to mode based on scores:
-    - missing_concept → "concept"
-    - Ta ≥ 0.6 AND Tu ≥ 0.6 → "coach"
-    - Ta < 0.6 AND Tu < 0.6 → "scaffold"
-    - else → "guided"
+    Routes to:
+    - CONCEPT node if missing concepts detected
+    - ASSESS_APPROACH node if all concepts understood
     
     Returns:
-        Partial state update with Ta, Tu, mode, missing_concept
+        Partial state update with missing_concepts list
     """
     print("\n" + "="*60)
-    print("📊 ASSESSMENT NODE")
+    print("📊 ASSESSMENT NODE - Concept Check")
     print("="*60)
     
     # Get student's response from last message
@@ -170,54 +182,365 @@ def assess_student_response(state: MathAgentState) -> Dict[str, Any]:
     problem_data = load_problem_from_json(problem_id)
     required_concepts = format_required_concepts(problem_data.get("required_concepts", []))
     
-    # Build assessment prompt with conversation history
-    parser = PydanticOutputParser(pydantic_object=AssessmentResponse)
+    # Build concept check prompt
+    parser = PydanticOutputParser(pydantic_object=ConceptCheckResponse)
     format_instructions = parser.get_format_instructions()
     
-    assessment_user_msg = ASSESSMENT_USER_TEMPLATE.format(
+    concept_check_user_msg = CONCEPT_CHECK_USER_TEMPLATE.format(
         problem=problem,
-        user_input=user_input,
-        required_concepts=required_concepts
+        required_concepts=required_concepts,
+        user_input=user_input
     )
     
     # Build messages with conversation history
-    assessment_messages = build_messages_with_history(
+    concept_check_messages = build_messages_with_history(
         state=state,
-        system_prompt=ASSESSMENT_SYSTEM_PROMPT,
-        user_prompt=assessment_user_msg,
+        system_prompt=CONCEPT_CHECK_SYSTEM_PROMPT,
+        user_prompt=concept_check_user_msg,
         format_instructions=format_instructions
     )
     
     # Invoke LLM
-    print("🤖 Calling LLM for assessment...")
-    response = invoke_llm_with_fallback(assessment_messages, "ASSESSMENT")
+    print("🤖 Calling LLM for concept check...")
+    response = invoke_llm_with_fallback(concept_check_messages, "CONCEPT_CHECK")
+    
+    # Parse response
+    try:
+        json_str = extract_json_block(response.content)
+        concept_check = parser.parse(json_str)
+    except Exception as e:
+        print(f"❌ Error parsing concept check response: {e}")
+        print(f"Raw response: {response.content}")
+        # Fallback to no missing concepts
+        concept_check = ConceptCheckResponse(
+            missing_concepts=[],
+            reasoning="Unable to parse concept check response"
+        )
+    
+    print(f"📊 Concept Check Results:")
+    print(f"   Missing Concepts: {concept_check.missing_concepts or 'None'}")
+    print(f"   Reasoning: {concept_check.reasoning}")
+    
+    if concept_check.missing_concepts:
+        print(f"🎯 Routing to CONCEPT node (missing: {', '.join(concept_check.missing_concepts)})")
+    else:
+        print(f"✅ All concepts understood, routing to ASSESS_APPROACH")
+    
+    return {
+        "missing_concepts": concept_check.missing_concepts,
+        "last_user_msg": user_input,
+        "current_state": "ASSESSMENT",
+    }
+
+
+# ============================================================================
+# CONCEPT NODE (Standalone - Not a Mode)
+# ============================================================================
+
+def concept_node(state: MathAgentState) -> Dict[str, Any]:
+    """
+    CONCEPT node: Teach missing prerequisite concepts.
+    
+    Features:
+    - Teaches concepts with analogies and examples
+    - Tracks interaction count (max 3 per session)
+    - Tracks visit count (max 2 per concept)
+    - Asks micro-check questions to verify understanding
+    
+    Returns:
+        Partial state update with concepts_taught and updated counters
+    """
+    print("\n" + "="*60)
+    print("💡 CONCEPT NODE")
+    print("="*60)
+    
+    messages = state.get("messages", [])
+    problem = state["problem"]
+    missing_concepts = state.get("missing_concepts", [])
+    concepts_taught = state.get("concepts_taught", [])
+    concept_visit_count = state.get("concept_visit_count", {})
+    interaction_count = state.get("concept_interaction_count", 0)
+    
+    # Get user's latest response (if any - might be first time in concept node)
+    user_input = None
+    for msg in reversed(messages):
+        if isinstance(msg, HumanMessage):
+            user_input = msg.content
+            break
+    
+    if not missing_concepts:
+        print("⚠️ No missing concepts specified, should not be in concept node")
+        return {
+            "current_state": "CONCEPT",
+        }
+    
+    # Get the first concept to teach (we teach one at a time)
+    current_concept = missing_concepts[0]
+    
+    # Check if we've exceeded visit limit for this concept
+    visits = concept_visit_count.get(current_concept, 0)
+    print(f"📚 Teaching concept: {current_concept} (visit {visits + 1}/{MAX_CONCEPT_VISITS_PER_CONCEPT})")
+    
+    # Check if we've exceeded interaction limit
+    if interaction_count >= MAX_CONCEPT_INTERACTIONS:
+        print(f"⏭️ Max interactions ({MAX_CONCEPT_INTERACTIONS}) reached for this concept session")
+        # Move on - mark concept as taught even if not fully understood
+        concepts_taught.append(current_concept)
+        remaining_concepts = missing_concepts[1:]
+        
+        if remaining_concepts:
+            # More concepts to teach
+            print(f"📚 Moving to next concept. Remaining: {remaining_concepts}")
+            return {
+                "missing_concepts": remaining_concepts,
+                "concepts_taught": concepts_taught,
+                "concept_interaction_count": 0,  # Reset for next concept
+                "current_state": "CONCEPT",
+            }
+        else:
+            # All concepts taught (or attempted)
+            print("✅ All concepts covered")
+            return {
+                "missing_concepts": [],
+                "concepts_taught": concepts_taught,
+                "concept_interaction_count": 0,
+                "current_state": "CONCEPT",
+            }
+    
+    # Build concept teaching prompt
+    parser = PydanticOutputParser(pydantic_object=ConceptResponse)
+    format_instructions = parser.get_format_instructions()
+    
+    concept_user_msg = CONCEPT_USER_TEMPLATE.format(
+        missing_concept=current_concept,
+        problem=problem
+    )
+    
+    # Build messages with conversation history
+    concept_messages = build_messages_with_history(
+        state=state,
+        system_prompt=CONCEPT_SYSTEM_PROMPT,
+        user_prompt=concept_user_msg,
+        format_instructions=format_instructions
+    )
+    
+    # Invoke LLM
+    print(f"🤖 Calling LLM to teach concept: {current_concept}")
+    response = invoke_llm_with_fallback(concept_messages, "CONCEPT")
+    
+    # Parse response
+    try:
+        json_str = extract_json_block(response.content)
+        concept_resp = parser.parse(json_str)
+    except Exception as e:
+        print(f"❌ Error parsing concept response: {e}")
+        # Fallback response
+        concept_resp = ConceptResponse(
+            concept_explanation=f"Let me explain {current_concept}...",
+            analogy="Think of it like this...",
+            micro_check_question="Do you understand?",
+            encouragement="You're doing great!"
+        )
+    
+    # Build response message
+    response_message = f"**Let's learn about {current_concept}!** 🌟\n\n{concept_resp.concept_explanation}\n\n**Analogy:** {concept_resp.analogy}\n\n{concept_resp.encouragement}\n\n**Quick Check:** {concept_resp.micro_check_question}"
+    
+    messages.append(AIMessage(content=response_message))
+    
+    # Increment interaction count
+    interaction_count += 1
+    
+    # Update visit count for this concept
+    concept_visit_count[current_concept] = visits + 1
+    
+    # If student has responded to micro-check, move to next concept
+    if user_input and interaction_count >= 1:
+        # Simple heuristic: if they responded, assume they attempted the micro-check
+        # Mark this concept as taught
+        if current_concept not in concepts_taught:
+            concepts_taught.append(current_concept)
+        
+        remaining_concepts = missing_concepts[1:]
+        
+        if remaining_concepts:
+            # More concepts to teach
+            print(f"📚 Moving to next concept. Remaining: {remaining_concepts}")
+            return {
+                "missing_concepts": remaining_concepts,
+                "concepts_taught": concepts_taught,
+                "concept_visit_count": concept_visit_count,
+                "concept_interaction_count": 0,  # Reset for next concept
+                "agent_output": response_message,
+                "messages": messages,
+                "current_state": "CONCEPT",
+            }
+        else:
+            # All concepts taught
+            print("✅ All concepts taught")
+            return {
+                "missing_concepts": [],
+                "concepts_taught": concepts_taught,
+                "concept_visit_count": concept_visit_count,
+                "concept_interaction_count": 0,
+                "agent_output": response_message,
+                "messages": messages,
+                "current_state": "CONCEPT",
+            }
+    
+    return {
+        "concept_visit_count": concept_visit_count,
+        "concept_interaction_count": interaction_count,
+        "agent_output": response_message,
+        "messages": messages,
+        "current_state": "CONCEPT",
+    }
+
+
+# ============================================================================
+# RE-ASK NODE
+# ============================================================================
+
+def re_ask_start_questions_node(state: MathAgentState) -> Dict[str, Any]:
+    """
+    RE_ASK node: After teaching concepts, re-ask the same START questions.
+    
+    Asks the student the same questions from START node:
+    1. What do you understand from this question?
+    2. What approach would you use?
+    
+    Returns:
+        Partial state update with re-ask message
+    """
+    print("\n" + "="*60)
+    print("🔄 RE-ASK NODE")
+    print("="*60)
+    
+    messages = state.get("messages", [])
+    problem = state["problem"]
+    concepts_taught = state.get("concepts_taught", [])
+    
+    # Build re-ask prompt
+    parser = PydanticOutputParser(pydantic_object=str)  # Simple string response
+    
+    re_ask_user_msg = RE_ASK_USER_TEMPLATE.format(
+        problem=problem,
+        concepts_taught=", ".join(concepts_taught) if concepts_taught else "some key concepts"
+    )
+    
+    # Build messages
+    re_ask_messages = [
+        SystemMessage(content=RE_ASK_SYSTEM_PROMPT),
+        HumanMessage(content=re_ask_user_msg)
+    ]
+    
+    # Invoke LLM
+    print(f"🤖 Calling LLM to re-ask questions after teaching: {concepts_taught}")
+    response = invoke_llm_with_fallback(re_ask_messages, "RE_ASK")
+    
+    response_message = response.content
+    messages.append(AIMessage(content=response_message))
+    
+    print("✅ Re-asked START questions")
+    
+    return {
+        "agent_output": response_message,
+        "messages": messages,
+        "post_concept_reassessment": True,  # Flag that we've re-asked
+        "current_state": "RE_ASK",
+    }
+
+
+# ============================================================================
+# ASSESS APPROACH NODE
+# ============================================================================
+
+def assess_approach_node(state: MathAgentState) -> Dict[str, Any]:
+    """
+    ASSESS_APPROACH node: Score Tu/Ta and route to appropriate pedagogical mode.
+    
+    This runs after:
+    - Concept teaching (via RE_ASK)
+    - Initial assessment (if no concepts missing)
+    - During solving loop (to check progress)
+    
+    Routes to mode based on scores:
+    - Ta ≥ 0.6 AND Tu ≥ 0.6 → "coach"
+    - Ta < 0.6 AND Tu < 0.6 → "scaffold"
+    - else → "guided"
+    
+    Returns:
+        Partial state update with Ta, Tu, mode
+    """
+    print("\n" + "="*60)
+    print("📊 ASSESS APPROACH NODE")
+    print("="*60)
+    
+    # Get student's response from last message
+    messages = state.get("messages", [])
+    if not messages:
+        print("⚠️ No messages in state, skipping assessment")
+        return {}
+    
+    # Find last HumanMessage
+    user_input = None
+    for msg in reversed(messages):
+        if isinstance(msg, HumanMessage):
+            user_input = msg.content
+            break
+    
+    if not user_input:
+        print("⚠️ No user input found, skipping assessment")
+        return {}
+    
+    problem = state["problem"]
+    concepts_taught = state.get("concepts_taught", [])
+    
+    # Build approach assessment prompt
+    parser = PydanticOutputParser(pydantic_object=ApproachAssessmentResponse)
+    format_instructions = parser.get_format_instructions()
+    
+    context = f"Student has learned: {', '.join(concepts_taught)}" if concepts_taught else "Initial assessment"
+    
+    approach_user_msg = APPROACH_ASSESSMENT_USER_TEMPLATE.format(
+        problem=problem,
+        user_input=user_input,
+        context=context
+    )
+    
+    # Build messages with conversation history
+    approach_messages = build_messages_with_history(
+        state=state,
+        system_prompt=APPROACH_ASSESSMENT_SYSTEM_PROMPT,
+        user_prompt=approach_user_msg,
+        format_instructions=format_instructions
+    )
+    
+    # Invoke LLM
+    print("🤖 Calling LLM for approach assessment...")
+    response = invoke_llm_with_fallback(approach_messages, "APPROACH_ASSESSMENT")
     
     # Parse response
     try:
         json_str = extract_json_block(response.content)
         assessment = parser.parse(json_str)
     except Exception as e:
-        print(f"❌ Error parsing assessment response: {e}")
+        print(f"❌ Error parsing approach assessment response: {e}")
         print(f"Raw response: {response.content}")
-        # Fallback to default values
-        assessment = AssessmentResponse(
-            Tu=0.3,
-            Ta=0.3,
-            reasoning="Unable to parse assessment response",
-            missing_concept=None
-        )
+        raise e
+        # # Fallback to default values
+        # assessment = ApproachAssessmentResponse(
+        #     Tu=0.3,
+        #     Ta=0.3,
+        #     reasoning="Unable to parse assessment response"
+        # )
     
-    print(f"📊 Assessment Results:")
+    print(f"📊 Approach Assessment Results:")
     print(f"   Tu (Understanding): {assessment.Tu:.2f}")
     print(f"   Ta (Approach): {assessment.Ta:.2f}")
     print(f"   Reasoning: {assessment.reasoning}")
-    print(f"   Missing Concept: {assessment.missing_concept or 'None'}")
     
     # Determine mode based on assessment
-    if assessment.missing_concept:
-        mode = "concept"
-        print(f"🎯 Routing to CONCEPT mode (missing: {assessment.missing_concept})")
-    elif assessment.Ta >= TA_THRESHOLD_HIGH and assessment.Tu >= TU_THRESHOLD_HIGH:
+    if assessment.Ta >= TA_THRESHOLD_HIGH and assessment.Tu >= TU_THRESHOLD_HIGH:
         mode = "coach"
         print(f"🎯 Routing to COACH mode (strong understanding & approach)")
     elif assessment.Ta < TA_THRESHOLD_HIGH and assessment.Tu < TU_THRESHOLD_HIGH:
@@ -231,9 +554,8 @@ def assess_student_response(state: MathAgentState) -> Dict[str, Any]:
         "Tu": assessment.Tu,
         "Ta": assessment.Ta,
         "mode": mode,
-        "missing_concept": assessment.missing_concept,
         "last_user_msg": user_input,
-        "current_state": "ASSESSMENT",
+        "current_state": "ASSESS_APPROACH",
     }
 
 
@@ -249,7 +571,9 @@ def adaptive_solver(state: MathAgentState) -> Dict[str, Any]:
     - _coach_logic() for coach mode
     - _guided_logic() for guided mode
     - _scaffold_logic() for scaffold mode
-    - _concept_logic() for concept mode
+    
+    Note: concept teaching is now handled by standalone concept_node,
+    not as a mode within adaptive_solver.
     
     Returns:
         Partial state update from the specific mode logic
@@ -267,8 +591,6 @@ def adaptive_solver(state: MathAgentState) -> Dict[str, Any]:
         return _guided_logic(state)
     elif mode == "scaffold":
         return _scaffold_logic(state)
-    elif mode == "concept":
-        return _concept_logic(state)
     else:
         print(f"⚠️ Unknown mode: {mode}, defaulting to guided")
         return _guided_logic(state)
@@ -284,7 +606,7 @@ def _coach_logic(state: MathAgentState) -> Dict[str, Any]:
     - If correct: mark as solved
     """
     print("\n🏆 COACH MODE")
-    
+
     
     messages = state.get("messages", [])
     problem = state["problem"]
@@ -582,102 +904,6 @@ def _scaffold_logic(state: MathAgentState) -> Dict[str, Any]:
     return update_dict
 
 
-def _concept_logic(state: MathAgentState) -> Dict[str, Any]:
-    """
-    CONCEPT mode: Teach missing prerequisite concept.
-    
-    - Explain concept using age-appropriate analogy
-    - Provide one micro-check question
-    - After correct answer to check: resume previous_mode
-    """
-    print("\n💡 CONCEPT MODE")
-    
-    messages = state.get("messages", [])
-    problem = state["problem"]
-    missing_concept = state.get("missing_concept")
-    previous_mode = state.get("previous_mode")
-    
-    # Get user's latest response
-    user_input = None
-    for msg in reversed(messages):
-        if isinstance(msg, HumanMessage):
-            user_input = msg.content
-            break
-    
-    if not missing_concept:
-        print("⚠️ No missing concept specified, returning to previous mode")
-        return {
-            "mode": previous_mode or "guided",
-            "current_state": "ADAPTIVE_SOLVER",
-        }
-    
-    # Save current mode as previous_mode if not already set
-    if not previous_mode:
-        previous_mode = "guided"  # Default to guided after concept teaching
-        update_previous_mode = True
-    else:
-        update_previous_mode = False
-    
-    # Build concept teaching prompt with conversation history
-    parser = PydanticOutputParser(pydantic_object=ConceptResponse)
-    format_instructions = parser.get_format_instructions()
-    
-    concept_user_msg = CONCEPT_USER_TEMPLATE.format(
-        missing_concept=missing_concept,
-        problem=problem
-    )
-    
-    # Build messages with conversation history
-    concept_messages = build_messages_with_history(
-        state=state,
-        system_prompt=CONCEPT_SYSTEM_PROMPT,
-        user_prompt=concept_user_msg,
-        format_instructions=format_instructions
-    )
-    
-    # Invoke LLM
-    print(f"🤖 Calling LLM to teach concept: {missing_concept}")
-    response = invoke_llm_with_fallback(concept_messages, "CONCEPT")
-    
-    # Parse response
-    try:
-        json_str = extract_json_block(response.content)
-        concept_resp = parser.parse(json_str)
-    except Exception as e:
-        print(f"❌ Error parsing concept response: {e}")
-        # Fallback response
-        concept_resp = ConceptResponse(
-            concept_explanation=f"Let me explain {missing_concept}...",
-            analogy="Think of it like this...",
-            micro_check_question="Do you understand?",
-            encouragement="You're doing great!"
-        )
-    
-    # Build response message
-    response_message = f"**Let's learn about {missing_concept}!**\n\n{concept_resp.concept_explanation}\n\n**Analogy:** {concept_resp.analogy}\n\n{concept_resp.encouragement}\n\n**Quick Check:** {concept_resp.micro_check_question}"
-    
-    messages.append(AIMessage(content=response_message))
-    
-    update_dict = {
-        "agent_output": response_message,
-        "messages": messages,
-        "current_state": "ADAPTIVE_SOLVER",
-    }
-    
-    if update_previous_mode:
-        update_dict["previous_mode"] = previous_mode
-    
-    # After teaching, check if student answered the micro-check
-    # For simplicity, we'll resume to previous mode immediately
-    # In a more sophisticated version, you'd validate the micro-check answer first
-    if user_input:  # If student has responded to micro-check
-        print(f"✅ Concept taught, resuming to {previous_mode} mode")
-        update_dict["mode"] = previous_mode
-        update_dict["missing_concept"] = None  # Clear the missing concept
-    
-    return update_dict
-
-
 # ============================================================================
 # REFLECTION NODE
 # ============================================================================
@@ -708,10 +934,8 @@ def reflection_node(state: MathAgentState) -> Dict[str, Any]:
     problem_data = load_problem_from_json(problem_id)
     final_answer = problem_data.get("final_answer", "the correct answer")
     
-    # Determine concepts learned (if any)
-    concepts_learned = []
-    if state.get("missing_concept"):
-        concepts_learned.append(state["missing_concept"])
+    # Determine concepts learned
+    concepts_learned = state.get("concepts_taught", [])
     
     # Build reflection prompt with conversation history
     parser = PydanticOutputParser(pydantic_object=ReflectionResponse)
