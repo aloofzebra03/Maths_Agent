@@ -79,6 +79,8 @@ class MathAgentState(TypedDict, total=False):
     concept_visit_count: Dict[str, int]  # Track visits per concept {"denominator": 1}
     concept_interaction_count: int  # Interactions in current concept session
     post_concept_reassessment: bool  # Flag: have we re-asked after teaching?
+    asked_concept: bool  # Flag: have we presented the concept teaching?
+    concept_tries: int  # Number of student attempts at micro-check (max 3)
     
     # Message tracking
     messages: Annotated[List[AnyMessage], add_messages]
@@ -282,3 +284,23 @@ class ApproachAssessmentResponse(BaseModel):
         if not 0.0 <= v <= 1.0:
             raise ValueError(f"Score must be between 0 and 1, got {v}")
         return v
+
+
+class ConceptEvaluationResponse(BaseModel):
+    """
+    Response when evaluating student's micro-check answer during concept teaching.
+    LLM evaluates student understanding AND generates response in a single call.
+    Used in try-counter pattern (max 3 tries).
+    """
+    
+    understood: bool = Field(
+        description="Whether the student's response shows understanding of the concept"
+    )
+    
+    next_state: Literal["move_on", "stay"] = Field(
+        description="'move_on' if concept is understood or max tries reached. 'stay' if need to re-teach."
+    )
+    
+    response_to_student: str = Field(
+        description="Message to student. Either: (1) praise + confirmation if understood, OR (2) re-explanation with simpler analogy + micro-check question again if not understood"
+    )

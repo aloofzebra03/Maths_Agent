@@ -124,17 +124,24 @@ def route_after_initial_assessment(state: MathAgentState) -> Literal["concept", 
         return "assess_approach"
 
 
-def route_after_concept(state: MathAgentState) -> Literal["re_ask"]:
+def route_after_concept(state: MathAgentState) -> Literal["concept", "re_ask"]:
     """
     Route from CONCEPT node.
     
-    In Option 2 (simplified flow), we always go to RE_ASK after teaching concepts.
-    
     Returns:
-        "re_ask" - always re-ask START questions after concept teaching
+        "concept" - if student needs retry OR more concepts to teach (self-loop)
+        "re_ask" - if all concepts taught
     """
-    print("✅ Concepts taught. Routing to RE_ASK to give student another try")
-    return "re_ask"
+    missing_concepts = state.get("missing_concepts", [])
+    
+    if missing_concepts:
+        # Still have concepts to teach (or retrying current concept)
+        print(f"📚 Remaining concepts: {missing_concepts}. Looping back to CONCEPT")
+        return "concept"
+    else:
+        # All concepts taught
+        print("✅ All concepts taught. Routing to RE_ASK")
+        return "re_ask"
 
 
 def should_continue_solving(state: MathAgentState) -> Literal["reflection", "assess_approach"]:
@@ -214,12 +221,13 @@ def create_graph():
         }
     )
     
-    # CONCEPT → RE_ASK (always)
-    # After teaching concepts, re-ask the START questions
+    # CONCEPT → conditional (CONCEPT or RE_ASK)
+    # After teaching concepts, either loop back for more concepts/retries or proceed to RE_ASK
     workflow.add_conditional_edges(
         "CONCEPT",
         route_after_concept,
         {
+            "concept": "CONCEPT",  # Self-loop for retries or next concept
             "re_ask": "RE_ASK"
         }
     )

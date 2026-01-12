@@ -20,6 +20,7 @@ from educational_agent_math_tutor.schemas import (
     ReflectionResponse,
     ConceptCheckResponse,
     ApproachAssessmentResponse,
+    ConceptEvaluationResponse,
 )
 from educational_agent_math_tutor.prompts import (
     START_SYSTEM_PROMPT,
@@ -42,6 +43,10 @@ from educational_agent_math_tutor.prompts import (
     RE_ASK_USER_TEMPLATE,
     APPROACH_ASSESSMENT_SYSTEM_PROMPT,
     APPROACH_ASSESSMENT_USER_TEMPLATE,
+    CONCEPT_EVALUATE_SYSTEM_PROMPT_EARLY,
+    CONCEPT_EVALUATE_USER_TEMPLATE_EARLY,
+    CONCEPT_EVALUATE_SYSTEM_PROMPT_FINAL,
+    CONCEPT_EVALUATE_USER_TEMPLATE_FINAL,
 )
 from educational_agent_math_tutor.config import (
     TA_THRESHOLD_HIGH,
@@ -113,6 +118,7 @@ def start_node(state: MathAgentState) -> Dict[str, Any]:
     print(f"🎯 Required concepts: {format_required_concepts(required_concepts)}")
     
     return {
+        "agent_output": greeting,
         "problem": question,
         "problem_id": problem_id,
         "steps": steps,
@@ -132,6 +138,8 @@ def start_node(state: MathAgentState) -> Dict[str, Any]:
         "concept_visit_count": {},
         "concept_interaction_count": 0,
         "post_concept_reassessment": False,
+        "asked_concept": False,
+        "concept_tries": 0,
     }
 
 
@@ -239,13 +247,17 @@ def assess_student_response(state: MathAgentState) -> Dict[str, Any]:
 
 def concept_node(state: MathAgentState) -> Dict[str, Any]:
     """
-    CONCEPT node: Teach missing prerequisite concepts.
+    CONCEPT node: Teach missing prerequisite concepts with interactive micro-checks.
+    
+    Uses try-counter pattern (max 3 tries per concept):
+    - First call: Teach concept + ask micro-check
+    - Subsequent calls: Evaluate response + decide (stay or move on) in SINGLE LLM call
     
     Features:
-    - Teaches concepts with analogies and examples
-    - Tracks interaction count (max 3 per session)
-    - Tracks visit count (max 2 per concept)
-    - Asks micro-check questions to verify understanding
+    - Single LLM call evaluation (efficient)
+    - Different prompts based on try count
+    - Forced transition at try 3
+    - Tracks visit count per concept (max 2 visits)
     
     Returns:
         Partial state update with concepts_taught and updated counters
@@ -255,18 +267,11 @@ def concept_node(state: MathAgentState) -> Dict[str, Any]:
     print("="*60)
     
     messages = state.get("messages", [])
-    problem = state["problem"]
+    # problem = state["problem"]
+    problem = None
     missing_concepts = state.get("missing_concepts", [])
     concepts_taught = state.get("concepts_taught", [])
     concept_visit_count = state.get("concept_visit_count", {})
-    interaction_count = state.get("concept_interaction_count", 0)
-    
-    # Get user's latest response (if any - might be first time in concept node)
-    user_input = None
-    for msg in reversed(messages):
-        if isinstance(msg, HumanMessage):
-            user_input = msg.content
-            break
     
     if not missing_concepts:
         print("⚠️ No missing concepts specified, should not be in concept node")
@@ -277,123 +282,191 @@ def concept_node(state: MathAgentState) -> Dict[str, Any]:
     # Get the first concept to teach (we teach one at a time)
     current_concept = missing_concepts[0]
     
-    # Check if we've exceeded visit limit for this concept
-    visits = concept_visit_count.get(current_concept, 0)
-    print(f"📚 Teaching concept: {current_concept} (visit {visits + 1}/{MAX_CONCEPT_VISITS_PER_CONCEPT})")
-    
-    # Check if we've exceeded interaction limit
-    if interaction_count >= MAX_CONCEPT_INTERACTIONS:
-        print(f"⏭️ Max interactions ({MAX_CONCEPT_INTERACTIONS}) reached for this concept session")
-        # Move on - mark concept as taught even if not fully understood
-        concepts_taught.append(current_concept)
-        remaining_concepts = missing_concepts[1:]
+    # ============================================
+    # FIRST TIME: Teach concept + ask micro-check
+    # ============================================
+    if not state.get("asked_concept", False):
+        print(f"📚 First time teaching concept: {current_concept}")
         
-        if remaining_concepts:
-            # More concepts to teach
-            print(f"📚 Moving to next concept. Remaining: {remaining_concepts}")
-            return {
-                "missing_concepts": remaining_concepts,
-                "concepts_taught": concepts_taught,
-                "concept_interaction_count": 0,  # Reset for next concept
-                "current_state": "CONCEPT",
-            }
-        else:
-            # All concepts taught (or attempted)
-            print("✅ All concepts covered")
-            return {
-                "missing_concepts": [],
-                "concepts_taught": concepts_taught,
-                "concept_interaction_count": 0,
-                "current_state": "CONCEPT",
-            }
+        # Update visit count for this concept
+        visits = concept_visit_count.get(current_concept, 0)
+        concept_visit_count[current_concept] = visits + 1
+        print(f"📊 Visit count: {concept_visit_count[current_concept]}/{MAX_CONCEPT_VISITS_PER_CONCEPT}")
+        
+        # Build concept teaching prompt
+        parser = PydanticOutputParser(pydantic_object=ConceptResponse)
+        format_instructions = parser.get_format_instructions()
+        
+        concept_user_msg = CONCEPT_USER_TEMPLATE.format(
+            missing_concept=current_concept,
+        )
+        
+        # Build messages with conversation history
+        concept_messages = build_messages_with_history(
+            state=state,
+            system_prompt=CONCEPT_SYSTEM_PROMPT,
+            user_prompt=concept_user_msg,
+            format_instructions=format_instructions
+        )
+        
+        # Invoke LLM
+        print(f"🤖 Calling LLM to teach concept: {current_concept}")
+        response = invoke_llm_with_fallback(concept_messages, "CONCEPT")
+        
+        # Parse response
+        try:
+            json_str = extract_json_block(response.content)
+            concept_resp = parser.parse(json_str)
+        except Exception as e:
+            print(f"❌ Error parsing concept response: {e}")
+            # Fallback response
+            concept_resp = ConceptResponse(
+                concept_explanation=f"Let me explain {current_concept}...",
+                analogy="Think of it like this...",
+                micro_check_question="Do you understand?",
+                encouragement="You're doing great!"
+            )
+        
+        # Build response message
+        response_message = f"**Let's learn about {current_concept}!** 🌟\n\n{concept_resp.concept_explanation}\n\n**Analogy:** {concept_resp.analogy}\n\n{concept_resp.encouragement}\n\n**Quick Check:** {concept_resp.micro_check_question}"
+        
+        messages.append(AIMessage(content=response_message))
+        
+        print("✅ Concept taught, waiting for student response")
+        
+        return {
+            "asked_concept": True,
+            "concept_tries": 0,
+            "concept_visit_count": concept_visit_count,
+            "agent_output": response_message,
+            "messages": messages,
+            "current_state": "CONCEPT",
+        }
     
-    # Build concept teaching prompt
-    parser = PydanticOutputParser(pydantic_object=ConceptResponse)
+    # ============================================
+    # SUBSEQUENT TIMES: Evaluate + Respond (SINGLE LLM CALL)
+    # ============================================
+    
+    # Get user's latest response
+    user_input = None
+    for msg in reversed(messages):
+        if isinstance(msg, HumanMessage):
+            user_input = msg.content
+            break
+    
+    if not user_input:
+        print("⚠️ No user input found, waiting for student response")
+        return {
+            "current_state": "CONCEPT",
+        }
+    
+    # Increment tries
+    tries = state.get("concept_tries", 0) + 1
+    print(f"📊 Evaluating student response (try {tries}/3)")
+    
+    # Get conversation history for context
+    previous_teaching = "\n".join([
+        f"{'AI' if isinstance(m, AIMessage) else 'Student'}: {m.content[:100]}..."
+        for m in messages[-6:] if isinstance(m, (AIMessage, HumanMessage))
+    ])
+    
+    # Build evaluation prompt based on try count
+    parser = PydanticOutputParser(pydantic_object=ConceptEvaluationResponse)
     format_instructions = parser.get_format_instructions()
     
-    concept_user_msg = CONCEPT_USER_TEMPLATE.format(
-        missing_concept=current_concept,
-        problem=problem
-    )
+    if tries < 3:
+        # Early tries: can re-teach if needed
+        system_prompt = CONCEPT_EVALUATE_SYSTEM_PROMPT_EARLY.format(tries=tries)
+        user_msg = CONCEPT_EVALUATE_USER_TEMPLATE_EARLY.format(
+            concept=current_concept,
+            student_response=user_input,
+            previous_teaching=previous_teaching
+        )
+    else:
+        # Final try: must move on
+        system_prompt = CONCEPT_EVALUATE_SYSTEM_PROMPT_FINAL
+        user_msg = CONCEPT_EVALUATE_USER_TEMPLATE_FINAL.format(
+            concept=current_concept,
+            problem=problem,
+            student_response=user_input
+        )
     
     # Build messages with conversation history
-    concept_messages = build_messages_with_history(
+    eval_messages = build_messages_with_history(
         state=state,
-        system_prompt=CONCEPT_SYSTEM_PROMPT,
-        user_prompt=concept_user_msg,
+        system_prompt=system_prompt,
+        user_prompt=user_msg,
         format_instructions=format_instructions
     )
     
-    # Invoke LLM
-    print(f"🤖 Calling LLM to teach concept: {current_concept}")
-    response = invoke_llm_with_fallback(concept_messages, "CONCEPT")
+    # Invoke LLM for evaluation
+    print(f"🤖 Calling LLM to evaluate understanding...")
+    response = invoke_llm_with_fallback(eval_messages, "CONCEPT_EVAL")
     
     # Parse response
     try:
         json_str = extract_json_block(response.content)
-        concept_resp = parser.parse(json_str)
+        eval_resp = parser.parse(json_str)
     except Exception as e:
-        print(f"❌ Error parsing concept response: {e}")
-        # Fallback response
-        concept_resp = ConceptResponse(
-            concept_explanation=f"Let me explain {current_concept}...",
-            analogy="Think of it like this...",
-            micro_check_question="Do you understand?",
-            encouragement="You're doing great!"
+        print(f"❌ Error parsing evaluation response: {e}")
+        # Fallback: assume not understood, stay for one more try
+        eval_resp = ConceptEvaluationResponse(
+            understood=False,
+            next_state="stay" if tries < 3 else "move_on",
+            response_to_student="Let me try to explain this differently..."
         )
     
-    # Build response message
-    response_message = f"**Let's learn about {current_concept}!** 🌟\n\n{concept_resp.concept_explanation}\n\n**Analogy:** {concept_resp.analogy}\n\n{concept_resp.encouragement}\n\n**Quick Check:** {concept_resp.micro_check_question}"
+    print(f"📊 Evaluation: understood={eval_resp.understood}, next_state={eval_resp.next_state}")
     
-    messages.append(AIMessage(content=response_message))
+    # Add LLM's response to conversation
+    messages.append(AIMessage(content=eval_resp.response_to_student))
     
-    # Increment interaction count
-    interaction_count += 1
-    
-    # Update visit count for this concept
-    concept_visit_count[current_concept] = visits + 1
-    
-    # If student has responded to micro-check, move to next concept
-    if user_input and interaction_count >= 1:
-        # Simple heuristic: if they responded, assume they attempted the micro-check
-        # Mark this concept as taught
+    # Decide next action based on evaluation
+    if eval_resp.next_state == "move_on":
+        # Student understood OR max tries reached
+        print(f"✅ Moving on from concept: {current_concept}")
+        
+        # Add to concepts taught if not already there
         if current_concept not in concepts_taught:
             concepts_taught.append(current_concept)
         
+        # Remove from missing concepts
         remaining_concepts = missing_concepts[1:]
         
+        # Reset flags for next concept
         if remaining_concepts:
-            # More concepts to teach
-            print(f"📚 Moving to next concept. Remaining: {remaining_concepts}")
+            print(f"📚 Next concept: {remaining_concepts[0]}")
             return {
                 "missing_concepts": remaining_concepts,
                 "concepts_taught": concepts_taught,
-                "concept_visit_count": concept_visit_count,
-                "concept_interaction_count": 0,  # Reset for next concept
-                "agent_output": response_message,
+                "asked_concept": False,  # Reset for next concept
+                "concept_tries": 0,
+                "agent_output": eval_resp.response_to_student,
                 "messages": messages,
                 "current_state": "CONCEPT",
             }
         else:
-            # All concepts taught
-            print("✅ All concepts taught")
+            # All concepts done
+            print("✅ All concepts taught!")
             return {
                 "missing_concepts": [],
                 "concepts_taught": concepts_taught,
-                "concept_visit_count": concept_visit_count,
-                "concept_interaction_count": 0,
-                "agent_output": response_message,
+                "asked_concept": False,
+                "concept_tries": 0,
+                "agent_output": eval_resp.response_to_student,
                 "messages": messages,
                 "current_state": "CONCEPT",
             }
     
-    return {
-        "concept_visit_count": concept_visit_count,
-        "concept_interaction_count": interaction_count,
-        "agent_output": response_message,
-        "messages": messages,
-        "current_state": "CONCEPT",
-    }
+    else:  # next_state == "stay"
+        # Need to re-teach - stay in CONCEPT node
+        print(f"🔄 Re-teaching concept: {current_concept} (try {tries}/3)")
+        return {
+            "concept_tries": tries,
+            "agent_output": eval_resp.response_to_student,
+            "messages": messages,
+            "current_state": "CONCEPT",
+        }
 
 
 # ============================================================================
