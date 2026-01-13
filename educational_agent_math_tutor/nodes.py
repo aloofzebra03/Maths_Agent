@@ -502,6 +502,7 @@ def re_ask_start_questions_node(state: MathAgentState) -> Dict[str, Any]:
     
     # Build messages
     re_ask_messages = [
+        HumanMessage(content="Re-asking the same START questions after teaching concepts."),
         SystemMessage(content=RE_ASK_SYSTEM_PROMPT),
         HumanMessage(content=re_ask_user_msg)
     ]
