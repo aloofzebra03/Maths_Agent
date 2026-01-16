@@ -230,6 +230,7 @@ def load_problem_from_json(problem_id: str, problems_dir: str = "problems_json")
                 for problem_data in json_objects:
                     if problem_data.get('problem_id') == problem_id:
                         print(f"✅ Loaded problem '{problem_id}' from {filename}")
+                        print(f"📚 Problem data: {problem_data}")
                         return problem_data
                         
         except Exception as e:

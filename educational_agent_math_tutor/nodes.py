@@ -84,7 +84,7 @@ def start_node(state: MathAgentState) -> Dict[str, Any]:
     print("🚀 START NODE")
     print("="*60)
     
-    state['problem_id'] = 'add_frac_same_den_01'
+    state['problem_id'] = 'add_frac_diff_den_01'
     problem_id = state.get("problem_id")
     # print(f"📚 Loading problem ID: {problem_id}")
     if not problem_id:

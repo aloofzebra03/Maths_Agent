@@ -120,6 +120,7 @@
   "required_concepts": [
     "fraction_basics",
     "equivalent_fractions",
-    "addition_different_denominator"
+    "taking_lcm_of_denominators",
+    "addition_different_denominator_using_above_concepts"
   ]
 }
