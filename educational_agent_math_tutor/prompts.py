@@ -293,17 +293,7 @@ Your task:
 - Check if they demonstrate understanding of each required concept
 - Identify which required concepts (if any) the student does NOT understand yet
 
-**Important:** Only flag a concept as missing if the student clearly doesn't understand it. Don't flag concepts just because they didn't mention them explicitly - focus on whether they demonstrate understanding.
-
-Common concepts to check:
-- fraction_basics: What a fraction represents (parts of a whole)
-- numerator: The top number in a fraction
-- denominator: The bottom number in a fraction
-- equivalent_fractions: Fractions that represent the same value
-- common_denominator: Same denominator across fractions
-- addition_same_denominator: How to add fractions with same denominators
-- like_fractions: Fractions with the same denominator
-- unlike_fractions: Fractions with different denominators
+**Important:** Only flag a concept as missing if the student clearly doesn't understand it. Don't flag concepts just because they didn't mention them explicitly - focus only on whether they demonstrate understanding of the concept itself, without referring to the problem being solved.
 
 Return your assessment as JSON following the ConceptCheckResponse schema.
 """
@@ -409,7 +399,7 @@ CONCEPT_EVALUATE_SYSTEM_PROMPT_EARLY = """You are a patient math tutor evaluatin
 In a SINGLE response, do BOTH:
 1. Evaluate if the student's answer demonstrates understanding of the concept
 2. Generate the appropriate response:
-   - If understood: Praise them warmly and confirm they've got it.If this happens no need to ask another micro question.No need to ask any further questions. Just say something like let's move on.
+   - If understood: Praise them warmly and confirm they've got it.If this happens no need to ask another micro question.No need to ask any further questions. Just say something like let's move on.DONT ask anything about the original problem as there might still be more concepts to teach.
    - If not understood: Re-explain the concept using a SIMPLER or DIFFERENT analogy, then ask the micro-check question again
 
 **Guidelines:**
@@ -417,6 +407,7 @@ In a SINGLE response, do BOTH:
 - If re-explaining, try a different approach than before (simpler analogy, concrete example)
 - Keep language appropriate for 12-13 year olds
 - Accept partial understanding as "understood" if the core idea is there
+- In no way are you to refer to the problem being solved using the conversation history - focus only on the concept at hand
 
 Return JSON following the ConceptEvaluationResponse schema.
 """
@@ -428,7 +419,7 @@ CONCEPT_EVALUATE_USER_TEMPLATE_EARLY = """**Concept Being Taught:**
 {student_response}
 
 **Previous Teaching Attempts:**
-{previous_teaching}
+Understand from the conversation history how the concept was taught before.
 
 Evaluate their understanding and either move on or re-teach with a different approach.
 """

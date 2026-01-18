@@ -380,7 +380,7 @@ def concept_node(state: MathAgentState) -> Dict[str, Any]:
         user_msg = CONCEPT_EVALUATE_USER_TEMPLATE_EARLY.format(
             concept=current_concept,
             student_response=user_input,
-            previous_teaching=previous_teaching
+            # previous_teaching=previous_teaching
         )
     else:
         # Final try: must move on

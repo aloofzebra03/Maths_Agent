@@ -302,5 +302,5 @@ class ConceptEvaluationResponse(BaseModel):
     )
     
     response_to_student: str = Field(
-        description="Message to student. Either: (1) praise + confirmation if understood, OR (2) re-explanation with simpler analogy + micro-check question again if not understood"
+        description="Message to student. Either: (1) praise + confirmation if understood(Remember do NOT mention the original problem in any way whatsoever), OR (2) re-explanation with simpler analogy + micro-check question again if not understood"
     )

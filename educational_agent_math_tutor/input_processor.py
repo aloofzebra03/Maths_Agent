@@ -52,6 +52,9 @@ def is_base64_image(content: str) -> bool:
     # if not content or not isinstance(content, str):
     #     return False
     
+    if isinstance(content, str):
+        return False
+
     # Check for data URI prefix
     if content[0]['image_url']['url'].startswith('data:image/'):
         return True
