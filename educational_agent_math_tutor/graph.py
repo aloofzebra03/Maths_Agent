@@ -20,6 +20,7 @@ from educational_agent_math_tutor.nodes import (
     adaptive_solver,
     reflection_node,
 )
+from educational_agent_math_tutor.input_processor import detect_and_process_input
 
 
 # ============================================================================
@@ -63,9 +64,25 @@ def create_node_wrapper(node_func, node_name: str):
         # DETECT AND STORE NEW USER MESSAGE (mutate state directly)
         print(old_last_user_msg)
         messages = state.get("messages", [])
-        print(messages)
+        # print(messages)
         if messages and isinstance(messages[-1], HumanMessage):
-            text = messages[-1].content or ""
+            raw_content = messages[-1].content or ""
+            
+            # PROCESS MULTIMODAL INPUT (image/audio → text)
+            processed = detect_and_process_input(raw_content)
+            # print(f"############### Processed input: {processed['processed_text']}")
+            processed_text = processed["processed_text"]
+            
+            # If input was an image, update the message content with extracted text
+            if processed["input_type"] in ["image_path", "image_base64"]:
+                print(f"🖼️ Image input detected: {processed['input_type']}")
+                print(f"📝 OCR extracted: {processed_text[:100]}...")
+                # Replace image data/path with extracted text in message
+                messages[-1].content = processed_text
+                text = processed_text
+            else:
+                text = raw_content
+            
             if text and text != old_last_user_msg:
                 print(f"🆕 NEW USER MESSAGE DETECTED:")
                 print(f"   Old: {old_last_user_msg[:50] if old_last_user_msg else 'None'}...")
