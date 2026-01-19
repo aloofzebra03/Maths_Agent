@@ -306,7 +306,8 @@ def concept_node(state: MathAgentState) -> Dict[str, Any]:
             state=state,
             system_prompt=CONCEPT_SYSTEM_PROMPT,
             user_prompt=concept_user_msg,
-            format_instructions=format_instructions
+            format_instructions=format_instructions,
+            remove_problem_messages=True
         )
         
         # Invoke LLM
@@ -396,7 +397,8 @@ def concept_node(state: MathAgentState) -> Dict[str, Any]:
         state=state,
         system_prompt=system_prompt,
         user_prompt=user_msg,
-        format_instructions=format_instructions
+        format_instructions=format_instructions,
+        remove_problem_messages=True
     )
     
     # Invoke LLM for evaluation

@@ -277,7 +277,7 @@ def build_messages_with_history(
     system_prompt: str,
     user_prompt: str,
     format_instructions: Optional[str] = None,
-    max_history_messages: int = 20
+    remove_problem_messages: bool = False,
 ) -> List:
     """
     Build message list with conversation history for LLM invocation.
@@ -305,7 +305,10 @@ def build_messages_with_history(
     # Add recent conversation history from state
     conversation_history = state.get("messages", [])
 
-    messages.extend(conversation_history)
+    if(remove_problem_messages):
+        messages.extend(conversation_history[3:])
+    else:
+        messages.extend(conversation_history)
 
     messages.append(SystemMessage(content=system_prompt))
 
