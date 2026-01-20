@@ -1,0 +1,138 @@
+{
+  "problem_id": "alg_simplify_expr_01",
+  "topic": "Simplifying Algebraic Expressions (Combining Like Terms)",
+  "difficulty": "easy",
+
+  "question": "Simplify: 21b - 32 + 7b - 20b",
+
+  "final_answer": "8b - 32",
+
+  "canonical_solution": {
+    "steps": [
+      {
+        "step_id": 1,
+        "description": "Identify the like terms (terms containing 'b') and constant terms.",
+        "concept": "like_and_unlike_terms"
+      },
+      {
+        "step_id": 2,
+        "description": "Group the like terms together: (21b + 7b - 20b) - 32.",
+        "concept": "grouping_terms"
+      },
+      {
+        "step_id": 3,
+        "description": "Add/Subtract the coefficients of the like terms: 21 + 7 - 20 = 8.",
+        "concept": "arithmetic_operations"
+      },
+      {
+        "step_id": 4,
+        "description": "Combine the result with the constant: 8b - 32.",
+        "concept": "algebraic_expression_formation"
+      }
+    ]
+  },
+
+  "alternative_solutions": [
+    {
+      "method": "Column method",
+      "steps": [
+        "Write coefficients of 'b' in a column: +21, +7, -20",
+        "Calculate sum: 21 + 7 = 28; 28 - 20 = 8",
+        "Append the variable 'b' to get 8b",
+        "Bring down the constant -32"
+      ]
+    },
+    {
+      "method": "Rearrangement method",
+      "steps": [
+        "Rewrite the expression putting all 'b' terms first: 21b + 7b - 20b - 32",
+        "Simplify left to right: 28b - 20b - 32",
+        "Final result: 8b - 32"
+      ]
+    }
+  ],
+
+  "common_mistakes": [
+    "Combining constant (-32) with variable terms (e.g., writing 8b - 32 as -24b)",
+    "Ignoring the negative sign in front of 20b",
+    "Adding coefficients incorrectly"
+  ],
+
+  "required_concepts": [
+    "variable_and_constant",
+    "like_and_unlike_terms",
+    "addition_subtraction_integers"
+  ]
+}
+{
+  "problem_id": "alg_solve_eqn_01",
+  "topic": "Simple Equations (Solving for a Variable)",
+  "difficulty": "medium",
+
+  "question": "Solve for n: 3n + 7 = 25",
+
+  "final_answer": "n = 6",
+
+  "canonical_solution": {
+    "steps": [
+      {
+        "step_id": 1,
+        "description": "Identify the variable (n) and the operations applied to it (multiplied by 3, added 7).",
+        "concept": "equation_structure"
+      },
+      {
+        "step_id": 2,
+        "description": "Isolate the term with the variable by transposing +7 to the RHS. It becomes -7.",
+        "concept": "transposition_method"
+      },
+      {
+        "step_id": 3,
+        "description": "Simplify the RHS: 25 - 7 = 18. Equation becomes 3n = 18.",
+        "concept": "arithmetic_operations"
+      },
+      {
+        "step_id": 4,
+        "description": "Separate n from its coefficient (3) by dividing both sides by 3.",
+        "concept": "balancing_method"
+      },
+      {
+        "step_id": 5,
+        "description": "n = 18 / 3, so n = 6.",
+        "concept": "division_integers"
+      }
+    ]
+  },
+
+  "alternative_solutions": [
+    {
+      "method": "Balancing method (Step-by-step)",
+      "steps": [
+        "Subtract 7 from both sides: 3n + 7 - 7 = 25 - 7",
+        "Equation becomes: 3n = 18",
+        "Divide both sides by 3: 3n/3 = 18/3",
+        "Result: n = 6"
+      ]
+    },
+    {
+      "method": "Trial and Error",
+      "steps": [
+        "Try n = 5: 3(5) + 7 = 22 (Too low)",
+        "Try n = 7: 3(7) + 7 = 28 (Too high)",
+        "Try n = 6: 3(6) + 7 = 18 + 7 = 25 (Correct)"
+      ]
+    }
+  ],
+
+  "common_mistakes": [
+    "Subtracting 3 instead of dividing by 3 (thinking n = 18 - 3)",
+    "Transposing 3 first before subtracting 7 (order of operations error)",
+    "Calculation error in 25 - 7"
+  ],
+
+  "required_concepts": [
+    "variable_isolation",
+    "inverse_operations",
+    "transposition",
+    "arithmetic_operations"
+  ]
+}

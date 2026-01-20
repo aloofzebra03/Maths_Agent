@@ -1,0 +1,127 @@
+{
+  "problem_id": "geo_lines_angles_01",
+  "topic": "Lines and Angles (Linear Pair)",
+  "difficulty": "easy",
+
+  "question": "Two angles form a linear pair. If one angle is 110°, find the measure of the other angle.",
+
+  "final_answer": "70°",
+
+  "canonical_solution": {
+    "steps": [
+      {
+        "step_id": 1,
+        "description": "Recall the property of a linear pair: the sum of angles is 180°.",
+        "concept": "linear_pair_axiom"
+      },
+      {
+        "step_id": 2,
+        "description": "Set up the equation: 110° + x = 180°.",
+        "concept": "equation_formation"
+      },
+      {
+        "step_id": 3,
+        "description": "Subtract 110° from 180° to find x.",
+        "concept": "arithmetic_subtraction"
+      },
+      {
+        "step_id": 4,
+        "description": "x = 70°.",
+        "concept": "final_calculation"
+      }
+    ]
+  },
+
+  "alternative_solutions": [
+    {
+      "method": "Supplementary Angles reasoning",
+      "steps": [
+        "Angles on a straight line are supplementary",
+        "Supplementary means they add up to 180°",
+        "180 - 110 = 70"
+      ]
+    },
+    {
+      "method": "Visual Protractor Method",
+      "steps": [
+        "Imagine a straight line (180°)",
+        "Remove the 110° portion",
+        "The remaining portion is 70°"
+      ]
+    }
+  ],
+
+  "common_mistakes": [
+    "Subtracting from 90° (confusing linear pair with complementary angles)",
+    "Subtracting from 360° (confusing with complete angle)",
+    "Calculation errors (e.g., 180 - 110 = 90)"
+  ],
+
+  "required_concepts": [
+    "linear_pair",
+    "supplementary_angles",
+    "angles_on_straight_line"
+  ]
+}
+{
+  "problem_id": "geo_triangle_prop_01",
+  "topic": "The Triangle and its Properties (Exterior Angle)",
+  "difficulty": "medium",
+
+  "question": "An exterior angle of a triangle is of measure 105° and one of its interior opposite angles is of measure 45°. Find the measure of the other interior opposite angle.",
+
+  "final_answer": "60°",
+
+  "canonical_solution": {
+    "steps": [
+      {
+        "step_id": 1,
+        "description": "Identify the relevant property: Exterior Angle Property of a Triangle.",
+        "concept": "exterior_angle_property"
+      },
+      {
+        "step_id": 2,
+        "description": "State the formula: Exterior Angle = Sum of two interior opposite angles.",
+        "concept": "formula_application"
+      },
+      {
+        "step_id": 3,
+        "description": "Substitute the known values: 105° = 45° + x.",
+        "concept": "substitution"
+      },
+      {
+        "step_id": 4,
+        "description": "Solve for x: x = 105° - 45°.",
+        "concept": "transposition"
+      },
+      {
+        "step_id": 5,
+        "description": "x = 60°.",
+        "concept": "arithmetic_subtraction"
+      }
+    ]
+  },
+
+  "alternative_solutions": [
+    {
+      "method": "Linear Pair + Angle Sum Property",
+      "steps": [
+        "Find the interior adjacent angle using linear pair: 180° - 105° = 75°",
+        "Use Angle Sum Property for the triangle: 180° - (75° + 45°)",
+        "180° - 120° = 60°"
+      ]
+    }
+  ],
+
+  "common_mistakes": [
+    "Adding 105 and 45 (forgetting that 105 is the sum, not an addend)",
+    "Subtracting from 180 immediately (confusing with supplementary angles)",
+    "Assuming the triangle is isosceles or equilateral without evidence"
+  ],
+
+  "required_concepts": [
+    "exterior_angle_property",
+    "interior_opposite_angles",
+    "equation_solving"
+  ]
+}
