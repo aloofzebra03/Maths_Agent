@@ -277,7 +277,7 @@ def create_graph():
     checkpointer = MemorySaver()
     
     graph = workflow.compile(
-        # checkpointer=checkpointer,
+        checkpointer=checkpointer,
         interrupt_after=["START", "ADAPTIVE_SOLVER", "RE_ASK", "CONCEPT"]  # Pause for student input
     )
     

@@ -43,21 +43,30 @@ def is_base64_image(content: str) -> bool:
     Check if content string is a base64 encoded image.
     
     Args:
-        content: String to check
+        content: String to check (or dict for LangGraph Studio format)
         
     Returns:
         True if it's a base64 image data URI
     """
     print(f"Checking if content is base64 image...")
-    # if not content or not isinstance(content, str):
-    #     return False
     
-    if isinstance(content, str):
+    if not content:
         return False
-
-    # Check for data URI prefix
-    if content[0]['image_url']['url'].startswith('data:image/'):
-        return True
+    
+    # Check for Streamlit format: direct data URI string
+    if isinstance(content, str):
+        if content.startswith('data:image/'):
+            print("✅ Detected Streamlit base64 format")
+            return True
+        return False
+    
+    # Check for LangGraph Studio format: dict with image_url
+    if isinstance(content, list) and len(content) > 0:
+        if isinstance(content[0], dict) and 'image_url' in content[0]:
+            url = content[0].get('image_url', {}).get('url', '')
+            if url.startswith('data:image/'):
+                print("✅ Detected LangGraph Studio base64 format")
+                return True
     
     return False
 
@@ -95,13 +104,21 @@ def detect_and_process_input(content: str) -> Dict[str, Any]:
     # Check for base64 image (must check before file path)
     if is_base64_image(content):
         print(f"📸 Detected base64 image input")
-        result = process_image_from_base64(content[0]['image_url']['url'])
-        result["original_content"] = content[:100] + "..." if len(content) > 100 else content
+        
+        # Extract base64 data based on format
+        if isinstance(content, str):
+            # Streamlit format: direct data URI
+            base64_data = content
+        else:
+            # LangGraph Studio format: dict with image_url
+            base64_data = content[0]['image_url']['url']
+        
+        result = process_image_from_base64(base64_data)
         return {
             "processed_text": result["text"],
             "input_type": "image_base64",
             "success": result["success"],
-            "original_content": result.get("original_content", "base64_data")
+            "original_content": base64_data[:100] + "..." if len(base64_data) > 100 else base64_data
         }
     
     print(f"Content is not base64 image.")
