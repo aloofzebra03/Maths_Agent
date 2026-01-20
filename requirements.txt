@@ -41,7 +41,7 @@ charset-normalizer
 chromadb
 click
 cloudpickle
-cloudfare
+cloudflare
 colorama
 coloredlogs
 comm
