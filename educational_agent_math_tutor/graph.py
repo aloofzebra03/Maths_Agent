@@ -7,7 +7,7 @@ Defines the StateGraph with nodes, edges, and routing logic.
 from datetime import datetime
 from typing import Literal
 from langgraph.graph import StateGraph, END
-from langgraph.checkpoint.memory import MemorySaver
+from langgraph.checkpoint.memory import InMemorySaver
 from langchain_core.messages import HumanMessage
 
 from educational_agent_math_tutor.schemas import MathAgentState
@@ -274,7 +274,7 @@ def create_graph():
     workflow.add_edge("REFLECTION", END)
     
     # Compile with MemorySaver checkpointer
-    checkpointer = MemorySaver()
+    checkpointer = InMemorySaver()
     
     graph = workflow.compile(
         checkpointer=checkpointer,

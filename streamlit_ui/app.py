@@ -24,6 +24,7 @@ sys.path.insert(0, str(parent_dir))
 
 from educational_agent_math_tutor.graph import graph
 from langchain_core.messages import HumanMessage
+from langgraph.types import Command
 
 
 # ============================================================================
@@ -305,18 +306,30 @@ def main():
             }
         }
         
+        print(f"\n🔑 Streamlit: Using session_id: {st.session_state.session_id}")
+        print(f"📊 Streamlit: Messages count: {len(st.session_state.messages)}")
+        
         with st.spinner("Thinking..."):
             try:
                 # Check if this is the initial call or continuation
-                if not st.session_state.messages:
+                if len(st.session_state.messages) == 0:
                     # Initial call - start the session
+                    print("\n📍 Streamlit: Initial graph invoke")
+                    user_message = HumanMessage(content="start")
                     initial_state = {
                         "problem_id": st.session_state.selected_problem_id,
-                        "messages": []
+                        "messages": [user_message]
                     }
                     result = graph.invoke(initial_state, config)
+                    
+                    # Extract AI response from initial greeting
+                    ai_response = result.get("agent_output", "No response from agent")
+                    print("Session started for sure")
+                    # Append assistant message
+                    st.session_state.messages.append(("assistant", ai_response))
+                    
                 else:
-                    # Continuation - get last user message
+                    # Continuation - get last user message content only
                     last_user_msg = None
                     for role, msg in reversed(st.session_state.messages):
                         if role == "user":
@@ -324,10 +337,61 @@ def main():
                             break
                     
                     if last_user_msg:
-                        result = graph.invoke(
-                            {"messages": [HumanMessage(content=last_user_msg)]},
-                            config
+                        print(f"\n📍 Streamlit: Continuing graph with user message: {last_user_msg[:50]}...")
+                        
+                        # Create user message
+                        user_message = HumanMessage(content=last_user_msg)
+                        
+                        # Use Command with resume=True to continue from interrupted state
+                        cmd = Command(
+                            resume=True,
+                            update={
+                                "messages": [user_message],  # LangGraph will add this to existing messages
+                            },
                         )
+                        
+                        print(f"🔄 About to invoke graph with Command...")
+                        print(f"   - resume: True")
+                        print(f"   - thread_id: {st.session_state.session_id}")
+                        
+                        try:
+                            # Continue the graph from where it was interrupted
+                            result = graph.invoke(cmd, config)
+                            print(f"✅ Graph invoke returned successfully")
+                        except Exception as invoke_error:
+                            print(f"❌ ERROR during graph.invoke: {invoke_error}")
+                            import traceback
+                            traceback.print_exc()
+                            raise
+                        
+                        print(f"\n✅ Graph invoke completed")
+                        print(f"📋 Result type: {type(result)}")
+                        print(f"📋 Result keys: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}")
+                        if isinstance(result, dict):
+                            print(f"🎯 Current state: {result.get('current_state', 'N/A')}")
+                            print(f"💬 Agent output: {result.get('agent_output', 'N/A')[:100] if result.get('agent_output') else 'None'}...")
+                            print(f"📊 Messages count: {len(result.get('messages', []))}")
+                        
+                        # Debug logging
+                        if isinstance(result, dict):
+                            messages = result.get("messages", [])
+                            print(f"🔍 Streamlit DEBUG - Post-invoke state:")
+                            print(f"📊 Total messages in graph: {len(messages)}")
+                            
+                            # Show last few messages for verification
+                            if messages:
+                                print("📜 Last 3 messages in graph state:")
+                                for i, msg in enumerate(messages[-3:]):
+                                    msg_type = msg.__class__.__name__
+                                    content = (msg.content[:50] + "...") if len(msg.content) > 50 else msg.content
+                                    print(f"  {len(messages)-3+i+1}. {msg_type}: {content}")
+                        
+                        # Extract AI response
+                        ai_response = result.get("agent_output", "No response from agent")
+                        
+                        # Append assistant message
+                        st.session_state.messages.append(("assistant", ai_response))
+                        
                     else:
                         st.error("No user message found to process")
                         st.stop()
@@ -335,11 +399,8 @@ def main():
                 # Store result for debugging
                 st.session_state.last_result = result
                 
-                # Extract AI response
-                ai_response = result.get("agent_output", "No response from agent")
-                
-                # Append assistant message
-                st.session_state.messages.append(("assistant", ai_response))
+                print(f"📍 Streamlit: Graph completed. Current state: {result.get('current_state')}")
+                print(f"📍 Streamlit: Agent output: {ai_response[:100]}...")
                 
             except Exception as e:
                 st.error(f"Error communicating with agent: {e}")
