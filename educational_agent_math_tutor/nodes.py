@@ -322,14 +322,11 @@ def concept_node(state: MathAgentState) -> Dict[str, Any]:
             print(f"❌ Error parsing concept response: {e}")
             # Fallback response
             concept_resp = ConceptResponse(
-                concept_explanation=f"Let me explain {current_concept}...",
-                analogy="Think of it like this...",
-                micro_check_question="Do you understand?",
-                encouragement="You're doing great!"
+                teaching_response=f"Hey! Let me help you understand {current_concept}. Think of it like this... [natural explanation]. Does that make sense to you?"
             )
         
-        # Build response message
-        response_message = f"**Let's learn about {current_concept}!** 🌟\n\n{concept_resp.concept_explanation}\n\n**Analogy:** {concept_resp.analogy}\n\n{concept_resp.encouragement}\n\n**Quick Check:** {concept_resp.micro_check_question}"
+        # Use the natural teaching response directly
+        response_message = concept_resp.teaching_response
         
         messages.append(AIMessage(content=response_message))
         

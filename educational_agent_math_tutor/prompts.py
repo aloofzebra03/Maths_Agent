@@ -232,6 +232,7 @@ Teaching approach:
 4. Ask one check question to verify understanding
 
 After they answer the check question correctly, we'll resume the problem where they left off.
+Also ensure that you are not too verbose in the response.The response should be crisp and to the point.
 
 Return your response as JSON following the ConceptResponse schema.
 """

@@ -205,20 +205,8 @@ class ConceptResponse(BaseModel):
     Response from CONCEPT mode - teach missing prerequisite concept.
     """
     
-    concept_explanation: str = Field(
-        description="Clear explanation of the concept using Class 7 appropriate language and analogy"
-    )
-    
-    analogy: str = Field(
-        description="Relatable analogy or visual description to make the concept concrete"
-    )
-    
-    micro_check_question: str = Field(
-        description="One simple question to verify understanding of this concept before resuming"
-    )
-    
-    encouragement: str = Field(
-        description="Encouraging message to build confidence"
+    teaching_response: str = Field(
+        description="A natural, conversational response that teaches the concept warmly. Include explanation with analogies, examples, and end with a question to check understanding. Speak like a friendly tutor having a conversation, not a textbook."
     )
 
 
