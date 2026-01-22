@@ -1,0 +1,22 @@
+# ============================================================================
+# Core Dependencies for Math Tutoring Agent Streamlit UI
+# ============================================================================
+
+# UI Framework
+streamlit
+
+# LangChain & LLM
+langchain-google-genai
+langchain-core
+langgraph
+pydantic
+
+# Environment & Configuration
+python-dotenv
+
+# OCR via Cloudflare Workers AI
+cloudflare
+
+# Protobuf - PINNED for Streamlit compatibility (critical!)
+protobuf==3.20.3
+
