@@ -206,7 +206,7 @@ class ConceptResponse(BaseModel):
     """
     
     teaching_response: str = Field(
-        description="A natural, conversational response that teaches the concept warmly. Include explanation with analogies, examples, and end with a question to check understanding. Speak like a friendly tutor having a conversation, not a textbook."
+        description="A natural, conversational response that teaches the concept warmly. Include explanation with analogies, examples, and end with a question to check understanding. Remember we want the text to be minimal.Speak like a friendly tutor having a conversation, not a textbook."
     )
 
 
@@ -290,5 +290,5 @@ class ConceptEvaluationResponse(BaseModel):
     )
     
     response_to_student: str = Field(
-        description="Message to student. Either: (1) praise + confirmation if understood(Remember do NOT mention the original problem in any way whatsoever), OR (2) re-explanation with simpler analogy + micro-check question again if not understood"
+        description="Message to student. Either: (1) praise + confirmation if understood(Remember do NOT mention the original problem in any way whatsoever.Also do not say anything about moving on), OR (2) re-explanation with simpler analogy + micro-check question again if not understood"
     )

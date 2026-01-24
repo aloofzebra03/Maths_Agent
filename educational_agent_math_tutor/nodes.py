@@ -5,6 +5,7 @@ Contains all pedagogical nodes: START, ASSESSMENT, ADAPTIVE_SOLVER, REFLECTION.
 """
 
 import json
+from pyexpat.errors import messages
 from typing import Dict, Any
 from datetime import datetime
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
@@ -362,11 +363,11 @@ def concept_node(state: MathAgentState) -> Dict[str, Any]:
     tries = state.get("concept_tries", 0) + 1
     print(f"📊 Evaluating student response (try {tries}/3)")
     
-    # Get conversation history for context
-    previous_teaching = "\n".join([
-        f"{'AI' if isinstance(m, AIMessage) else 'Student'}: {m.content[:100]}..."
-        for m in messages[-6:] if isinstance(m, (AIMessage, HumanMessage))
-    ])
+    # # Get conversation history for context
+    # previous_teaching = "\n".join([
+    #     f"{'AI' if isinstance(m, AIMessage) else 'Student'}: {m.content[:100]}..."
+    #     for m in messages[-6:] if isinstance(m, (AIMessage, HumanMessage))
+    # ])
     
     # Build evaluation prompt based on try count
     parser = PydanticOutputParser(pydantic_object=ConceptEvaluationResponse)
@@ -418,7 +419,6 @@ def concept_node(state: MathAgentState) -> Dict[str, Any]:
     print(f"📊 Evaluation: understood={eval_resp.understood}, next_state={eval_resp.next_state}")
     
     # Add LLM's response to conversation
-    messages.append(AIMessage(content=eval_resp.response_to_student))
     
     # Decide next action based on evaluation
     if eval_resp.next_state == "move_on":
@@ -434,25 +434,31 @@ def concept_node(state: MathAgentState) -> Dict[str, Any]:
         
         # Reset flags for next concept
         if remaining_concepts:
+            ai_message = eval_resp.response_to_student
+            ai_message += f"\n\n Let's move on to the next concept: {remaining_concepts[0].replace('_', ' ').title()}."
+            messages.append(AIMessage(content=ai_message))
             print(f"📚 Next concept: {remaining_concepts[0]}")
             return {
                 "missing_concepts": remaining_concepts,
                 "concepts_taught": concepts_taught,
                 "asked_concept": False,  # Reset for next concept
                 "concept_tries": 0,
-                "agent_output": eval_resp.response_to_student,
+                "agent_output": ai_message,
                 "messages": messages,
                 "current_state": "CONCEPT",
             }
         else:
             # All concepts done
             print("✅ All concepts taught!")
+            ai_message = eval_resp.response_to_student
+            ai_message += "\n\n You've understood all the prerequisite concepts. Let's get back to solving the main problem."
+            messages.append(AIMessage(content=ai_message))
             return {
                 "missing_concepts": [],
                 "concepts_taught": concepts_taught,
                 "asked_concept": False,
                 "concept_tries": 0,
-                "agent_output": eval_resp.response_to_student,
+                "agent_output": ai_message,
                 "messages": messages,
                 "current_state": "CONCEPT",
             }
