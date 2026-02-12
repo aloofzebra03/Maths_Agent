@@ -1,0 +1,126 @@
+{
+  "problem_id": "large_num_calc_shortcut_01",
+  "topic": "Large Numbers (Properties of Operations)",
+  "difficulty": "medium",
+  "question": "Calculate the product of 72 and 125 using the relationship 125 = 1000/8.",
+  "final_answer": "9000",
+  "canonical_solution": {
+    "steps": [
+      {
+        "step_id": 1,
+        "description": "Substitute 125 with 1000/8 in the expression: 72 × (1000/8).",
+        "concept": "substitution"
+      },
+      {
+        "step_id": 2,
+        "description": "Rearrange the calculation to divide 72 by 8 first: (72 ÷ 8) × 1000.",
+        "concept": "associative_property"
+      },
+      {
+        "step_id": 3,
+        "description": "Calculate 72 ÷ 8 = 9.",
+        "concept": "arithmetic_division"
+      },
+      {
+        "step_id": 4,
+        "description": "Multiply by 1000: 9 × 1000 = 9000.",
+        "concept": "final_calculation"
+      }
+    ]
+  },
+  "alternative_solutions": [
+    {
+      "method": "Standard Multiplication",
+      "steps": [
+        "Multiply 72 by 5 (units digit): 360",
+        "Multiply 72 by 20 (tens digit): 1440",
+        "Multiply 72 by 100 (hundreds digit): 7200",
+        "Sum the partial products: 360 + 1440 + 7200 = 9000"
+      ]
+    },
+    {
+      "method": "Decomposition",
+      "steps": [
+        "Break 72 into 70 + 2",
+        "Calculate 70 × 125 = 8750",
+        "Calculate 2 × 125 = 250",
+        "Add: 8750 + 250 = 9000"
+      ]
+    }
+  ],
+  "common_mistakes": [
+    "Calculation errors during standard long multiplication",
+    "Incorrectly dividing 1000 by 8 (getting a result other than 125)",
+    "Forgetting to multiply the result of the division by 1000"
+  ],
+  "required_concepts": [
+    "multiplication_properties",
+    "fraction_multiplication",
+    "mental_math_strategies"
+  ]
+}
+{
+  "problem_id": "large_num_decomposition_01",
+  "topic": "Large Numbers (Decomposition)",
+  "difficulty": "medium",
+  "question": "Using a calculator that only has buttons for +1, +10, +100, +1000, and +10000, write the expression to obtain the number 56,354 using the fewest possible button clicks.",
+  "final_answer": "(5 × 10000) + (6 × 1000) + (3 × 100) + (5 × 10) + (4 × 1)",
+  "canonical_solution": {
+    "steps": [
+      {
+        "step_id": 1,
+        "description": "Analyze the place value of each digit in 56,354.",
+        "concept": "place_value_analysis"
+      },
+      {
+        "step_id": 2,
+        "description": "Identify the ten-thousands digit: 5. This requires 5 clicks of +10000.",
+        "concept": "decomposition"
+      },
+      {
+        "step_id": 3,
+        "description": "Identify the thousands digit: 6. This requires 6 clicks of +1000.",
+        "concept": "decomposition"
+      },
+      {
+        "step_id": 4,
+        "description": "Identify the hundreds digit: 3. This requires 3 clicks of +100.",
+        "concept": "decomposition"
+      },
+      {
+        "step_id": 5,
+        "description": "Identify the tens digit: 5. This requires 5 clicks of +10.",
+        "concept": "decomposition"
+      },
+      {
+        "step_id": 6,
+        "description": "Identify the ones digit: 4. This requires 4 clicks of +1.",
+        "concept": "decomposition"
+      },
+      {
+        "step_id": 7,
+        "description": "Combine into an expression: (5 × 10000) + (6 × 1000) + (3 × 100) + (5 × 10) + (4 × 1).",
+        "concept": "expression_formation"
+      }
+    ]
+  },
+  "alternative_solutions": [
+    {
+      "method": "Addition approach",
+      "steps": [
+        "Write the expanded form: 50000 + 6000 + 300 + 50 + 4",
+        "Convert each term to button multiples: 5*10000 + 6*1000 + 3*100 + 5*10 + 4*1"
+      ]
+    }
+  ],
+  "common_mistakes": [
+    "Using more smaller buttons than necessary (e.g., using ten 100s to make 1000 instead of one 1000)",
+    "Misidentifying the place value (e.g., swapping hundreds and thousands)",
+    "Calculation errors in counting the total clicks (though not asked for in the expression)"
+  ],
+  "required_concepts": [
+    "expanded_form",
+    "place_value",
+    "optimization"
+  ]
+}

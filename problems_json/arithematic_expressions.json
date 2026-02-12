@@ -1,0 +1,102 @@
+{
+  "problem_id": "arith_expr_eval_01",
+  "topic": "Arithmetic Expressions (Order of Operations)",
+  "difficulty": "medium",
+  "question": "Evaluate the following expression by identifying its terms: 48 - 10 × 2 + 16 ÷ 2",
+  "final_answer": "36",
+  "canonical_solution": {
+    "steps": [
+      {
+        "step_id": 1,
+        "description": "Identify the terms in the expression. The terms are separated by '+' or '-' signs[cite: 3672]. The terms are 48, -10 × 2, and 16 ÷ 2[cite: 4438].",
+        "concept": "identifying_terms"
+      },
+      {
+        "step_id": 2,
+        "description": "Evaluate the multiplication and division terms first. -10 × 2 = -20 and 16 ÷ 2 = 8[cite: 4438].",
+        "concept": "evaluating_terms"
+      },
+      {
+        "step_id": 3,
+        "description": "Rewrite the expression with the evaluated terms: 48 - 20 + 8[cite: 4438].",
+        "concept": "simplification"
+      },
+      {
+        "step_id": 4,
+        "description": "Perform the addition and subtraction from left to right: 48 - 20 = 28, and 28 + 8 = 36[cite: 4444].",
+        "concept": "final_calculation"
+      }
+    ]
+  },
+  "alternative_solutions": [
+    {
+      "method": "Brackets Method",
+      "steps": [
+        "Rewrite using brackets to isolate operations: 48 - (10 × 2) + (16 ÷ 2) [cite: 4438]",
+        "Solve inside brackets: 48 - 20 + 8",
+        "Solve: 28 + 8 = 36"
+      ]
+    }
+  ],
+  "common_mistakes": [
+    "Subtracting 10 from 48 before multiplying by 2 (violating order of operations)",
+    "Adding 2 + 16 before dividing by 2",
+    "Ignoring the negative sign associated with the term 10 × 2"
+  ],
+  "required_concepts": [
+    "terms_of_expression",
+    "order_of_operations",
+    "integer_arithmetic"
+  ]
+}
+{
+  "problem_id": "arith_distributive_prop_01",
+  "topic": "Arithmetic Expressions (Distributive Property)",
+  "difficulty": "medium",
+  "question": "Find the value of 97 × 25 using the distributive property.",
+  "final_answer": "2425",
+  "canonical_solution": {
+    "steps": [
+      {
+        "step_id": 1,
+        "description": "Rewrite 97 as (100 - 3) to use numbers that are easier to multiply[cite: 4105].",
+        "concept": "number_decomposition"
+      },
+      {
+        "step_id": 2,
+        "description": "Apply the distributive property: (100 - 3) × 25 = 100 × 25 - 3 × 25[cite: 4108].",
+        "concept": "distributive_property"
+      },
+      {
+        "step_id": 3,
+        "description": "Calculate the products: 100 × 25 = 2500 and 3 × 25 = 75[cite: 4108].",
+        "concept": "multiplication"
+      },
+      {
+        "step_id": 4,
+        "description": "Subtract the results: 2500 - 75 = 2425[cite: 4108].",
+        "concept": "subtraction"
+      }
+    ]
+  },
+  "alternative_solutions": [
+    {
+      "method": "Standard Multiplication",
+      "steps": [
+        "Multiply 97 by 5: 485",
+        "Multiply 97 by 20: 1940",
+        "Add: 485 + 1940 = 2425"
+      ]
+    }
+  ],
+  "common_mistakes": [
+    "Incorrectly expanding the brackets (e.g., 100 × 25 - 3)",
+    "Calculation errors in subtraction (2500 - 75)",
+    "Choosing a decomposition that makes multiplication harder (e.g., 90 + 7)"
+  ],
+  "required_concepts": [
+    "distributive_property",
+    "mental_math",
+    "multiplication_strategies"
+  ]
+}
