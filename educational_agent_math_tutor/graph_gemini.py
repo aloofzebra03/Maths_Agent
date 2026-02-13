@@ -19,6 +19,7 @@ from educational_agent_math_tutor.nodes_gemini import (
     assess_approach_node,
     adaptive_solver,
     reflection_node,
+    end_node,
 )
 from educational_agent_math_tutor.input_processor import detect_and_process_input
 
@@ -271,8 +272,8 @@ def create_graph():
     )
     
     # REFLECTION → END (always)
-    workflow.add_edge("REFLECTION", END)
-    
+    workflow.add_edge("REFLECTION", "END")
+    workflow.add_edge("END", END)
     # Compile with MemorySaver checkpointer
     checkpointer = InMemorySaver()
     

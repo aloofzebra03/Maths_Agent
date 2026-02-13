@@ -1074,5 +1074,18 @@ def reflection_node(state: MathAgentState) -> Dict[str, Any]:
     return {
         "agent_output": response_message,
         "messages": messages,
-        "current_state": "REFLECTION",
+        "current_state": "END",
+    }
+
+
+def end_node(state: MathAgentState) -> Dict[str, Any]:
+    """
+    END node: End the conversation.
+    """
+    print("\n" + "="*60)
+    print("🏁 END NODE")
+    print("="*60)
+    
+    return {
+        "current_state": "END",
     }

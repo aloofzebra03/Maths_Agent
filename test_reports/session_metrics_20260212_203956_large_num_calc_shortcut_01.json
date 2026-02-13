@@ -1,0 +1,22 @@
+{
+  "concepts_covered": [
+    "Multiplication",
+    "Division",
+    "Fractional Representation",
+    "Number Properties",
+    "Problem Solving Strategies",
+    "Mathematical Relationships"
+  ],
+  "num_concepts_covered": 6,
+  "clarity_conciseness_score": 5.0,
+  "user_type": "High",
+  "user_interest_rating": 4.0,
+  "user_engagement_rating": 4.0,
+  "enjoyment_probability": 0.85,
+  "quiz_score": 0.0,
+  "error_handling_count": 0,
+  "adaptability": true,
+  "session_id": "20260212_203956_large_num_calc_shortcut_01",
+  "total_interactions": 0,
+  "persona_name": "Eager Student"
+}

@@ -1,0 +1,22 @@
+{
+  "concepts_covered": [
+    "Multiplication",
+    "Properties of Multiplication",
+    "Simplifying Calculations",
+    "Fractions",
+    "Fraction Multiplication",
+    "Simplifying Fractions"
+  ],
+  "num_concepts_covered": 6,
+  "clarity_conciseness_score": 4.0,
+  "user_type": "Medium",
+  "user_interest_rating": 2.0,
+  "user_engagement_rating": 3.0,
+  "enjoyment_probability": 0.4,
+  "quiz_score": 0.0,
+  "error_handling_count": 7,
+  "adaptability": true,
+  "session_id": "20260212_223356_large_num_calc_shortcut_01",
+  "total_interactions": 0,
+  "persona_name": "Confused Student"
+}

@@ -12,6 +12,7 @@ from typing import List, Optional, Dict, Any
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 import dotenv
+
 dotenv.load_dotenv(dotenv_path=".env", override=True)
 
 
@@ -151,7 +152,7 @@ def invoke_llm_with_fallback(messages: List, operation_name: str = "LLM call"):
         llm = get_llm(model=selected_model)
     
     try:
-        print(f"▶️ Invoking LLM for operation: {operation_name} with messages: {messages}")
+        print(f"▶️ Invoking LLM for operation: {operation_name}")
         response = llm.invoke(messages)
         print(f"✅ {operation_name} - Success with model: {selected_model}")
         return response
@@ -298,7 +299,7 @@ def build_messages_with_history(
     Returns:
         List of messages ready for LLM invocation
     """
-    messages = []
+    temp_messages = []
     
     # Add system message with core instruction
     
@@ -306,19 +307,21 @@ def build_messages_with_history(
     conversation_history = state.get("messages", [])
 
     if(remove_problem_messages):
-        messages.extend(conversation_history[3:])
+        temp_messages.extend(conversation_history[3:])
     else:
-        messages.extend(conversation_history)
+        temp_messages.extend(conversation_history)
 
-    messages.append(SystemMessage(content=system_prompt))
+    # temp_messages is a local variable here.It is not the same as the messages in the state
+
+    temp_messages.append(SystemMessage(content=system_prompt))
 
     # Add new user instruction
-    messages.append(HumanMessage(content=user_prompt))
+    temp_messages.append(HumanMessage(content=user_prompt))
     
     # Add format instructions if provided
     if format_instructions:
-        messages.append(HumanMessage(content=f"\n\n{format_instructions}"))
+        temp_messages.append(HumanMessage(content=f"\n\n{format_instructions}"))
     
     print(f"📊 Built message list: 1 system + {len(conversation_history)} history + 1 instruction + {1 if format_instructions else 0} format")
     
-    return messages
+    return temp_messages

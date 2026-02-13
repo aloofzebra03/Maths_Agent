@@ -1,0 +1,5 @@
+Metadata-Version: 2.4
+Name: agentic-ai-for-education
+Version: 0.0.1
+Summary: Educational agent with LangGraph, RAG, and Streamlit UI
+Requires-Python: >=3.10

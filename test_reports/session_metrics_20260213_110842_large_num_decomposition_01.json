@@ -1,0 +1,21 @@
+{
+  "concepts_covered": [
+    "Expanded Form",
+    "Place Value",
+    "Optimization",
+    "Problem Decomposition",
+    "Efficient Problem Solving"
+  ],
+  "num_concepts_covered": 5,
+  "clarity_conciseness_score": 4.0,
+  "user_type": "Medium",
+  "user_interest_rating": 3.0,
+  "user_engagement_rating": 4.0,
+  "enjoyment_probability": 0.75,
+  "quiz_score": 0.0,
+  "error_handling_count": 6,
+  "adaptability": true,
+  "session_id": "20260213_110842_large_num_decomposition_01",
+  "total_interactions": 0,
+  "persona_name": "Distracted Student"
+}

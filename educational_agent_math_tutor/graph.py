@@ -19,6 +19,7 @@ from educational_agent_math_tutor.nodes import (
     assess_approach_node,
     adaptive_solver,
     reflection_node,
+    end_node,
 )
 from educational_agent_math_tutor.input_processor import detect_and_process_input
 
@@ -219,6 +220,7 @@ def create_graph():
     workflow.add_node("ASSESS_APPROACH", create_node_wrapper(assess_approach_node, "ASSESS_APPROACH"))
     workflow.add_node("ADAPTIVE_SOLVER", create_node_wrapper(adaptive_solver, "ADAPTIVE_SOLVER"))
     workflow.add_node("REFLECTION", create_node_wrapper(reflection_node, "REFLECTION"))
+    workflow.add_node("END", create_node_wrapper(end_node, "END"))
     
     # Define edges
     workflow.set_entry_point("START")
@@ -271,14 +273,15 @@ def create_graph():
     )
     
     # REFLECTION → END (always)
-    workflow.add_edge("REFLECTION", END)
+    workflow.add_edge("REFLECTION", "END")
+    workflow.add_edge("END", END)
     
     # Compile with MemorySaver checkpointer
     checkpointer = InMemorySaver()
     
     graph = workflow.compile(
         checkpointer=checkpointer,
-        interrupt_after=["START", "ADAPTIVE_SOLVER", "RE_ASK", "CONCEPT"]  # Pause for student input
+        interrupt_after=["START", "ADAPTIVE_SOLVER", "RE_ASK", "CONCEPT","REFLECTION"]  # Pause for student input
     )
     
     print("✅ Graph compiled successfully")

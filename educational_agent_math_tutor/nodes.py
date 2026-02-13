@@ -419,7 +419,9 @@ def concept_node(state: MathAgentState) -> Dict[str, Any]:
     print(f"📊 Evaluation: understood={eval_resp.understood}, next_state={eval_resp.next_state}")
     
     # Add LLM's response to conversation
-    
+
+    ai_message = eval_resp.response_to_student
+
     # Decide next action based on evaluation
     if eval_resp.next_state == "move_on":
         # Student understood OR max tries reached
@@ -434,7 +436,6 @@ def concept_node(state: MathAgentState) -> Dict[str, Any]:
         
         # Reset flags for next concept
         if remaining_concepts:
-            ai_message = eval_resp.response_to_student
             ai_message += f"\n\n Let's move on to the next concept: {remaining_concepts[0].replace('_', ' ').title()}."
             messages.append(AIMessage(content=ai_message))
             print(f"📚 Next concept: {remaining_concepts[0]}")
@@ -450,7 +451,6 @@ def concept_node(state: MathAgentState) -> Dict[str, Any]:
         else:
             # All concepts done
             print("✅ All concepts taught!")
-            ai_message = eval_resp.response_to_student
             ai_message += "\n\n You've understood all the prerequisite concepts. Let's get back to solving the main problem."
             messages.append(AIMessage(content=ai_message))
             return {
@@ -466,9 +466,10 @@ def concept_node(state: MathAgentState) -> Dict[str, Any]:
     else:  # next_state == "stay"
         # Need to re-teach - stay in CONCEPT node
         print(f"🔄 Re-teaching concept: {current_concept} (try {tries}/3)")
+        messages.append(AIMessage(content=ai_message))
         return {
             "concept_tries": tries,
-            "agent_output": eval_resp.response_to_student,
+            "agent_output": ai_message,
             "messages": messages,
             "current_state": "CONCEPT",
         }
@@ -1074,5 +1075,17 @@ def reflection_node(state: MathAgentState) -> Dict[str, Any]:
     return {
         "agent_output": response_message,
         "messages": messages,
-        "current_state": "REFLECTION",
+        "current_state": "END",
+    }
+
+def end_node(state: MathAgentState) -> Dict[str, Any]:
+    """
+    END node: End the conversation.
+    """
+    print("\n" + "="*60)
+    print("🏁 END NODE")
+    print("="*60)
+    
+    return {
+        "current_state": "END",
     }
