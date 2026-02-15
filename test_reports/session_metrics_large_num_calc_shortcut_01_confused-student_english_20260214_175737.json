@@ -1,0 +1,21 @@
+{
+  "concepts_covered": [
+    "Multiplication",
+    "Division",
+    "Simplifying Calculations",
+    "Fraction Multiplication",
+    "Numerical Relationships (125 = 1000/8)"
+  ],
+  "num_concepts_covered": 5,
+  "clarity_conciseness_score": 5.0,
+  "user_type": "Medium",
+  "user_interest_rating": 2.0,
+  "user_engagement_rating": 3.0,
+  "enjoyment_probability": 0.65,
+  "quiz_score": 0.0,
+  "error_handling_count": 4,
+  "adaptability": true,
+  "session_id": "large_num_calc_shortcut_01_confused-student_english_20260214_175737",
+  "total_interactions": 0,
+  "persona_name": "Confused Student"
+}

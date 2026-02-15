@@ -1,0 +1,20 @@
+{
+  "concepts_covered": [
+    "Distributive Property of Multiplication",
+    "Breaking down numbers for easier calculation",
+    "Order of Operations (Parentheses)",
+    "Multiplication"
+  ],
+  "num_concepts_covered": 4,
+  "clarity_conciseness_score": 4.0,
+  "user_type": "Dull",
+  "user_interest_rating": 2.0,
+  "user_engagement_rating": 3.0,
+  "enjoyment_probability": 0.4,
+  "quiz_score": 0.0,
+  "error_handling_count": 8,
+  "adaptability": true,
+  "session_id": "arith_distributive_prop_01_dull-student_english_20260213_122516",
+  "total_interactions": 0,
+  "persona_name": "Dull Student"
+}

@@ -1,0 +1,21 @@
+{
+  "concepts_covered": [
+    "Multiplication",
+    "Commutative Property of Multiplication",
+    "Associative Property of Multiplication",
+    "Fraction Multiplication",
+    "Multiplying a fraction by a whole number"
+  ],
+  "num_concepts_covered": 5,
+  "clarity_conciseness_score": 3.0,
+  "user_type": "Dull",
+  "user_interest_rating": 2.0,
+  "user_engagement_rating": 3.0,
+  "enjoyment_probability": 0.3,
+  "quiz_score": 0.0,
+  "error_handling_count": 12,
+  "adaptability": true,
+  "session_id": "20260213_121006_large_num_calc_shortcut_01_distracted-student_english",
+  "total_interactions": 0,
+  "persona_name": "Distracted Student"
+}

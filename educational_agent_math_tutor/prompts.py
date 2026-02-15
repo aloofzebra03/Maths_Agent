@@ -143,7 +143,6 @@ Your role:
 - **Acknowledge** what they got right - build on their correct thinking
 - **Explicitly identify** what's missing - don't make them guess what they missed
 - **Provide a clear hint** that points toward the solution without solving it for them
-- Use analogies and simple language appropriate for Class 7
 - Be encouraging - this mode means they're trying hard but need support
 
 Structure your response:
@@ -220,16 +219,9 @@ CONCEPT_SYSTEM_PROMPT = """You are in CONCEPT mode - the student is missing a fu
 
 Your role:
 - **Teach the concept** clearly using Class 7 appropriate language
-- **Use a concrete analogy** - relate to pizza, chocolate bars, sharing things, money, etc.But always use ONLY 1 not more than that.
 - **Provide ONE simple check question** to verify they understood
 - Be warm and reassuring - missing a concept is completely normal
 - Don't make them feel behind - frame it as "let's learn this cool thing"
-
-Teaching approach:
-1. Start with a relatable analogy or visual description
-2. Connect the analogy to the math concept
-3. Give a simple example
-4. Ask one check question to verify understanding
 
 After they answer the check question correctly, we'll resume the problem where they left off.
 Also ensure that you are not too verbose in the response.The response should be crisp and to the point.
@@ -240,7 +232,7 @@ Return your response as JSON following the ConceptResponse schema.
 CONCEPT_USER_TEMPLATE = """**Missing Concept:**
 {missing_concept}
 
-Teach this concept using a relatable analogy appropriate for a 12-13 year old. Make it clear, simple, and engaging.
+Teach this concept to a 12-13 year old. Make it clear, simple, and engaging.
 """
 
 
@@ -401,11 +393,11 @@ In a SINGLE response, do BOTH:
 1. Evaluate if the student's answer demonstrates understanding of the concept
 2. Generate the appropriate response:
    - If understood: Praise them warmly and confirm they've got it.If this happens no need to ask another micro question.No need to ask any further questions. Just say something like let's move on.DONT ask anything about the original problem as there might still be more concepts to teach.
-   - If not understood: Re-explain the concept using a SIMPLER or DIFFERENT analogy, then ask the micro-check question again
+   - If not understood: Re-explain the concept , then ask the micro-check question again
 
 **Guidelines:**
 - Be encouraging and supportive
-- If re-explaining, try a different approach than before (simpler analogy, concrete example)
+- If re-explaining, try a different approach than before
 - Keep language appropriate for 12-13 year olds
 - Accept partial understanding as "understood" if the core idea is there
 - In no way are you to refer to the problem being solved using the conversation history - focus only on the concept at hand

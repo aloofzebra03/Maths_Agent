@@ -1,0 +1,20 @@
+{
+  "concepts_covered": [
+    "Distributive Property of Multiplication",
+    "Number Decomposition",
+    "Mental Math Strategies",
+    "Order of Operations"
+  ],
+  "num_concepts_covered": 4,
+  "clarity_conciseness_score": 5.0,
+  "user_type": "High",
+  "user_interest_rating": 5.0,
+  "user_engagement_rating": 5.0,
+  "enjoyment_probability": 0.95,
+  "quiz_score": 0.0,
+  "error_handling_count": 0,
+  "adaptability": true,
+  "session_id": "arith_distributive_prop_01_eager-student_english_20260214_175254",
+  "total_interactions": 0,
+  "persona_name": "Eager Student"
+}

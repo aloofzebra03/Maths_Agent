@@ -261,7 +261,7 @@ def run_test():
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     persona_name_slug = selected_persona.name.lower().replace(' ', '-')
     language = "english"  # Math tutor agent currently only supports English
-    session_id = f"{timestamp}_{selected_problem_id}_{persona_name_slug}_{language}"
+    session_id = f"{selected_problem_id}_{persona_name_slug}_{language}_{timestamp}"
     thread_id = session_id
     
     print("\n" + "="*80)
