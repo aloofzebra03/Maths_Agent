@@ -235,7 +235,7 @@ def main():
         
         # Start button
         if st.button("Start Session", type="primary"):
-            st.session_state.session_id = f"session_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            st.session_state.session_id = f"streamlit_session_{selected_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
             st.session_state.selected_problem_id = selected_id
             st.session_state.session_started = True
             st.session_state.processing = True
