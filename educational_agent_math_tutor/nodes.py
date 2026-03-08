@@ -63,6 +63,7 @@ from utils.shared_utils import (
     load_problem_from_json,
     format_required_concepts,
     build_messages_with_history,
+    translate_if_kannada,
 )
 
 
@@ -106,11 +107,18 @@ def start_node(state: MathAgentState) -> Dict[str, Any]:
     
     # Create greeting message
     greeting = START_GREETING_TEMPLATE.format(problem=question)
+    translated_greeting = translate_if_kannada(state, greeting)
     
     # Build system message with tutor persona
+    system_prompt_content = START_SYSTEM_PROMPT
+    if state.get("is_kannada", False):
+        system_prompt_content += "\n\nIMPORTANT: You must respond ONLY in Kannada language. All your responses must be in Kannada script, not English."
+    else:
+        system_prompt_content += "\n\nIMPORTANT: You must respond ONLY in English. All your responses must be in English, not Kannada or any other language."
+        
     messages = [
-        SystemMessage(content=START_SYSTEM_PROMPT),
-        AIMessage(content=greeting)
+        SystemMessage(content=system_prompt_content),
+        AIMessage(content=translated_greeting)
     ]
     
     print(f"✅ Loaded problem: {problem_id}")
@@ -119,7 +127,7 @@ def start_node(state: MathAgentState) -> Dict[str, Any]:
     print(f"🎯 Required concepts: {format_required_concepts(required_concepts)}")
     
     return {
-        "agent_output": greeting,
+        "agent_output": translated_greeting,
         "problem": question,
         "problem_id": problem_id,
         "steps": steps,
@@ -328,8 +336,9 @@ def concept_node(state: MathAgentState) -> Dict[str, Any]:
         
         # Use the natural teaching response directly
         response_message = concept_resp.teaching_response
+        translated_message = translate_if_kannada(state, response_message)
         
-        messages.append(AIMessage(content=response_message))
+        messages.append(AIMessage(content=translated_message))
         
         print("✅ Concept taught, waiting for student response")
         
@@ -337,7 +346,7 @@ def concept_node(state: MathAgentState) -> Dict[str, Any]:
             "asked_concept": True,
             "concept_tries": 0,
             "concept_visit_count": concept_visit_count,
-            "agent_output": response_message,
+            "agent_output": translated_message,
             "messages": messages,
             "current_state": "CONCEPT",
         }
@@ -437,14 +446,15 @@ def concept_node(state: MathAgentState) -> Dict[str, Any]:
         # Reset flags for next concept
         if remaining_concepts:
             ai_message += f"\n\n Let's move on to the next concept: {remaining_concepts[0].replace('_', ' ').title()}."
-            messages.append(AIMessage(content=ai_message))
+            translated_message = translate_if_kannada(state, ai_message)
+            messages.append(AIMessage(content=translated_message))
             print(f"📚 Next concept: {remaining_concepts[0]}")
             return {
                 "missing_concepts": remaining_concepts,
                 "concepts_taught": concepts_taught,
                 "asked_concept": False,  # Reset for next concept
                 "concept_tries": 0,
-                "agent_output": ai_message,
+                "agent_output": translated_message,
                 "messages": messages,
                 "current_state": "CONCEPT",
             }
@@ -452,13 +462,14 @@ def concept_node(state: MathAgentState) -> Dict[str, Any]:
             # All concepts done
             print("✅ All concepts taught!")
             ai_message += "\n\n You've understood all the prerequisite concepts. Let's get back to solving the main problem."
-            messages.append(AIMessage(content=ai_message))
+            translated_message = translate_if_kannada(state, ai_message)
+            messages.append(AIMessage(content=translated_message))
             return {
                 "missing_concepts": [],
                 "concepts_taught": concepts_taught,
                 "asked_concept": False,
                 "concept_tries": 0,
-                "agent_output": ai_message,
+                "agent_output": translated_message,
                 "messages": messages,
                 "current_state": "CONCEPT",
             }
@@ -466,10 +477,11 @@ def concept_node(state: MathAgentState) -> Dict[str, Any]:
     else:  # next_state == "stay"
         # Need to re-teach - stay in CONCEPT node
         print(f"🔄 Re-teaching concept: {current_concept} (try {tries}/3)")
-        messages.append(AIMessage(content=ai_message))
+        translated_message = translate_if_kannada(state, ai_message)
+        messages.append(AIMessage(content=translated_message))
         return {
             "concept_tries": tries,
-            "agent_output": ai_message,
+            "agent_output": translated_message,
             "messages": messages,
             "current_state": "CONCEPT",
         }
@@ -507,9 +519,15 @@ def re_ask_start_questions_node(state: MathAgentState) -> Dict[str, Any]:
     )
     
     # Build messages
+    system_prompt_content = RE_ASK_SYSTEM_PROMPT
+    if state.get("is_kannada", False):
+        system_prompt_content += "\n\nIMPORTANT: You must respond ONLY in Kannada language. All your responses must be in Kannada script, not English."
+    else:
+        system_prompt_content += "\n\nIMPORTANT: You must respond ONLY in English. All your responses must be in English, not Kannada or any other language."
+
     re_ask_messages = [
         HumanMessage(content="Re-asking the same START questions after teaching concepts."),
-        SystemMessage(content=RE_ASK_SYSTEM_PROMPT),
+        SystemMessage(content=system_prompt_content),
         HumanMessage(content=re_ask_user_msg)
     ]
     
@@ -518,12 +536,13 @@ def re_ask_start_questions_node(state: MathAgentState) -> Dict[str, Any]:
     response = invoke_llm_with_fallback(re_ask_messages, "RE_ASK")
     
     response_message = response.content
-    messages.append(AIMessage(content=response_message))
+    translated_message = translate_if_kannada(state, response_message)
+    messages.append(AIMessage(content=translated_message))
     
     print("✅ Re-asked START questions")
     
     return {
-        "agent_output": response_message,
+        "agent_output": translated_message,
         "messages": messages,
         "post_concept_reassessment": True,  # Flag that we've re-asked
         "current_state": "RE_ASK",
@@ -749,7 +768,7 @@ def _coach_logic(state: MathAgentState) -> Dict[str, Any]:
     if coach_resp.is_correct:
         print("✅ Student answer is correct!")
         response_parts.append(coach_resp.encouragement)
-        response_message = "\n\n".join(response_parts)
+        response_message = translate_if_kannada(state, "\n\n".join(response_parts))
         
         update_dict["solved"] = True
         update_dict["agent_output"] = response_message
@@ -762,7 +781,7 @@ def _coach_logic(state: MathAgentState) -> Dict[str, Any]:
         if nudge_count >= MAX_COACH_NUDGES:
             print("⬇️ Max nudges reached, downgrading to GUIDED mode")
             response_parts.append("I can see you're working hard on this. Let me give you some more specific help.")
-            response_message = "\n\n".join(response_parts)
+            response_message = translate_if_kannada(state, "\n\n".join(response_parts))
             
             update_dict["mode"] = "guided"
             update_dict["nudge_count"] = 0  # Reset for potential future use
@@ -775,7 +794,7 @@ def _coach_logic(state: MathAgentState) -> Dict[str, Any]:
             if coach_resp.reflective_question:
                 response_parts.append(coach_resp.reflective_question)
             response_parts.append(coach_resp.encouragement)
-            response_message = "\n\n".join(response_parts)
+            response_message = translate_if_kannada(state, "\n\n".join(response_parts))
             
             update_dict["nudge_count"] = nudge_count + 1
             update_dict["agent_output"] = response_message
@@ -849,11 +868,12 @@ def _guided_logic(state: MathAgentState) -> Dict[str, Any]:
     
     # Build response message
     response_message = f"{guided_resp.acknowledgment}\n\n{guided_resp.missing_piece}\n\n{guided_resp.hint}\n\n{guided_resp.encouragement}"
+    translated_message = translate_if_kannada(state, response_message)
     
-    messages.append(AIMessage(content=response_message))
+    messages.append(AIMessage(content=translated_message))
     
     return {
-        "agent_output": response_message,
+        "agent_output": translated_message,
         "messages": messages,
         "current_state": "ADAPTIVE_SOLVER",
     }
@@ -888,10 +908,11 @@ def _scaffold_logic(state: MathAgentState) -> Dict[str, Any]:
     if step_index >= len(steps):
         print("✅ All steps completed!")
         completion_message = "Excellent work! You've completed all the steps. You solved the problem! 🎉"
-        messages.append(AIMessage(content=completion_message))
+        translated_message = translate_if_kannada(state, completion_message)
+        messages.append(AIMessage(content=translated_message))
         return {
             "solved": True,
-            "agent_output": completion_message,
+            "agent_output": translated_message,
             "messages": messages,
             "current_state": "ADAPTIVE_SOLVER",
         }
@@ -909,12 +930,13 @@ def _scaffold_logic(state: MathAgentState) -> Dict[str, Any]:
         print("⏭️ Max retries reached, giving answer and moving to next step")
         
         answer_message = f"That's okay! Let me help you with this step.\n\n**Step {step_index + 1}:** {step_description}\n\nLet's move on to the next step!"
-        messages.append(AIMessage(content=answer_message))
+        translated_message = translate_if_kannada(state, answer_message)
+        messages.append(AIMessage(content=translated_message))
         
         return {
             "step_index": step_index + 1,
             "scaffold_retry_count": 0,  # Reset for next step
-            "agent_output": answer_message,
+            "agent_output": translated_message,
             "messages": messages,
             "current_state": "ADAPTIVE_SOLVER",
         }
@@ -967,11 +989,12 @@ def _scaffold_logic(state: MathAgentState) -> Dict[str, Any]:
         response_parts.append(f"\n{scaffold_resp.check_question}")
     
     response_message = "\n".join(response_parts)
-    messages.append(AIMessage(content=response_message))
+    translated_message = translate_if_kannada(state, response_message)
+    messages.append(AIMessage(content=translated_message))
     
     # Update retry count if this is a retry (user has already responded)
     update_dict = {
-        "agent_output": response_message,
+        "agent_output": translated_message,
         "messages": messages,
         "current_state": "ADAPTIVE_SOLVER",
         "current_step_description": step_description,
@@ -1068,12 +1091,13 @@ def reflection_node(state: MathAgentState) -> Dict[str, Any]:
         response_parts.append(f"{i}. {suggestion}")
     
     response_message = "\n".join(response_parts)
-    messages.append(AIMessage(content=response_message))
+    translated_message = translate_if_kannada(state, response_message)
+    messages.append(AIMessage(content=translated_message))
     
     print("✅ Reflection complete")
     
     return {
-        "agent_output": response_message,
+        "agent_output": translated_message,
         "messages": messages,
         "current_state": "END",
     }

@@ -8,12 +8,18 @@ and problem loading from JSON files.
 import os
 import json
 import re
+import requests
+import uuid
 from typing import List, Optional, Dict, Any
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 import dotenv
 
 dotenv.load_dotenv(dotenv_path=".env", override=True)
+
+# Type alias for AgentState
+AgentState = Dict[str, Any]
+
 
 
 # Import tracker utilities for API key management
@@ -159,6 +165,121 @@ def invoke_llm_with_fallback(messages: List, operation_name: str = "LLM call"):
     except Exception as e:
         print(f"❌ {operation_name} - Failed with model: {selected_model}. Error: {str(e)}")
         raise
+
+
+def translate_to_kannada_azure(text: str, 
+                               api_key: Optional[str] = None,
+                               endpoint: str = "https://api.cognitive.microsofttranslator.com/",
+                               region: str = "eastasia") -> str:
+    """
+    Translate text from English to Kannada using Azure Translator.
+    
+    Args:
+        text: Text to translate (English or mixed English-Kannada)
+        api_key: Azure Translator API key. If None, reads from AZURE_TRANSLATOR_KEY env var
+        endpoint: Azure Translator endpoint URL
+        region: Azure region for the translator service
+    
+    Returns:
+        Translated text in Kannada, or original text if translation fails
+    """
+    # Get API key from environment if not provided
+    if api_key is None:
+        api_key = os.getenv("AZURE_TRANSLATOR_KEY")
+    
+    if not api_key:
+        error_msg = "⚠️ Azure Translator API key not found in environment. Set AZURE_TRANSLATOR_KEY in .env file."
+        print(error_msg)
+        raise ValueError(error_msg)
+    
+    try:
+        path = '/translate'
+        constructed_url = endpoint + path
+        
+        params = {
+            'api-version': '3.0',
+            'from': 'en',
+            'to': 'kn'
+        }
+        
+        headers = {
+            'Ocp-Apim-Subscription-Key': api_key,
+            'Ocp-Apim-Subscription-Region': region,
+            'Content-type': 'application/json',
+            'X-ClientTraceId': str(uuid.uuid4())
+        }
+        
+        body = [{'text': text}]
+        
+        request = requests.post(constructed_url, params=params, headers=headers, json=body, timeout=10)
+        response = request.json()
+        
+        if request.status_code == 200 and response:
+            translated_text = response[0]['translations'][0]['text']
+            detected_lang = response[0].get('detectedLanguage', {}).get('language', 'unknown')
+            print(f"✅ Translated to Kannada (detected: {detected_lang}): {translated_text[:50]}...")
+            return translated_text
+        else:
+            print(f"⚠️ Azure translation failed with status {request.status_code}: {response}")
+            raise Exception(f"Azure translation failed with status {request.status_code}: {response}")
+            
+    except Exception as e:
+        print(f"⚠️ Azure translation error: {str(e)}. Returning original text.")
+        raise Exception(f"Azure translation error: {str(e)}. Returning original text.")
+
+
+def translate_to_english_gemini(text: str) -> str:
+    """
+    Translate text from Kannada (or any language) to English using the Gemini API.
+
+    Uses invoke_llm_with_fallback so the API key and model are selected and
+    tracked automatically by the existing tracker infrastructure.
+
+    Args:
+        text: Text to translate to English.
+
+    Returns:
+        Translated text in English, or original text if translation fails.
+    """
+    messages = [
+        SystemMessage(content=(
+            "You are a professional translator. "
+            "Translate the following text to English. "
+            "Output ONLY the translated text — no explanation, commentary, or extra formatting."
+        )),
+        HumanMessage(content=text),
+    ]
+
+    try:
+        response = invoke_llm_with_fallback(messages, operation_name="Kannada-to-English translation")
+        translated = response.content.strip()
+        print(f"✅ Translated to English: {translated[:80]}...")
+        return translated
+    except Exception as e:
+        print(f"⚠️ Gemini translation error: {str(e)}. Returning original text.")
+        return text
+
+
+def translate_if_kannada(state: AgentState, content: str) -> str:
+    """
+    Translate content to Kannada if is_kannada flag is set.
+    This is the single point of translation - use before setting agent_output.
+    
+    Args:
+        state: AgentState to check for is_kannada flag
+        content: Text to potentially translate
+    
+    Returns:
+        Translated text if is_kannada=True, otherwise original content
+    """
+    import re
+    if state.get("is_kannada", False):
+        # If content contains ANY English letters, call Azure
+        if re.search(r"[a-zA-Z]", content):
+            return translate_to_kannada_azure(content)
+        print("✅ Content is pure Kannada, no translation needed.")
+        # If pure Kannada (no English), skip API call
+    return content
 
 
 # ============================================================================
@@ -312,6 +433,11 @@ def build_messages_with_history(
         temp_messages.extend(conversation_history)
 
     # temp_messages is a local variable here.It is not the same as the messages in the state
+
+    if state.get("is_kannada", False):
+        system_prompt += "\n\nIMPORTANT: You must respond ONLY in Kannada language. All your responses must be in Kannada script, not English."
+    else:
+        system_prompt += "\n\nIMPORTANT: You must respond ONLY in English. All your responses must be in English, not Kannada or any other language."
 
     temp_messages.append(SystemMessage(content=system_prompt))
 

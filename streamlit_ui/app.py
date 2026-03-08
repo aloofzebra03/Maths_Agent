@@ -177,6 +177,9 @@ def initialize_session_state():
     
     if "uploaded_image_data" not in st.session_state:
         st.session_state.uploaded_image_data = None
+        
+    if "is_kannada" not in st.session_state:
+        st.session_state.is_kannada = False
 
 
 def reset_session():
@@ -188,6 +191,7 @@ def reset_session():
     st.session_state.processing = False
     st.session_state.last_result = None
     st.session_state.uploaded_image_data = None
+    st.session_state.is_kannada = False
 
 
 # ============================================================================
@@ -233,6 +237,10 @@ def main():
             **Question:** {problem_info['question']}
             """)
         
+        # Language selection toggle
+        is_kannada = st.toggle("Speak in Kannada / ಕನ್ನಡದಲ್ಲಿ ಮಾತನಾಡಿ", value=st.session_state.get("is_kannada", False))
+        st.session_state.is_kannada = is_kannada
+        
         # Start button
         if st.button("Start Session", type="primary"):
             st.session_state.session_id = f"streamlit_session_{selected_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -258,6 +266,15 @@ def main():
             st.info(f"**{problem_info.get('question', 'Unknown')}**")
             st.caption(f"Topic: {problem_info.get('topic', 'Unknown')}")
         
+        st.markdown("---")
+        
+        # Language Toggle (mid-session)
+        is_kannada_toggle = st.toggle("Speak in Kannada / ಕನ್ನಡದಲ್ಲಿ ಮಾತನಾಡಿ", 
+                                      value=st.session_state.is_kannada, 
+                                      key="kannada_toggle_sidebar")
+        if is_kannada_toggle != st.session_state.is_kannada:
+            st.session_state.is_kannada = is_kannada_toggle
+            
         st.markdown("---")
         
         # Reset button
@@ -318,7 +335,8 @@ def main():
                     user_message = HumanMessage(content="start")
                     initial_state = {
                         "problem_id": st.session_state.selected_problem_id,
-                        "messages": [user_message]
+                        "messages": [user_message],
+                        "is_kannada": st.session_state.is_kannada
                     }
                     result = graph.invoke(initial_state, config)
                     
@@ -347,6 +365,7 @@ def main():
                             resume=True,
                             update={
                                 "messages": [user_message],  # LangGraph will add this to existing messages
+                                "is_kannada": st.session_state.is_kannada
                             },
                         )
                         
