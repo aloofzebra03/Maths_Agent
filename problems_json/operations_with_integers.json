@@ -1,0 +1,102 @@
+{
+    "problem_id": "integer_mult_signs_01",
+    "topic": "Operations with Integers (Multiplication)",
+    "difficulty": "easy",
+    "question": "Evaluate the following multiplication of integers: 4 × (-6)",
+    "final_answer": "-24",
+    "canonical_solution": {
+      "steps": [
+        {
+          "step_id": 1,
+          "description": "Identify the signs of the multiplier and the multiplicand. The expression has a positive multiplier (4) and a negative multiplicand (-6)[cite: 182].",
+          "concept": "identifying_signs"
+        },
+        {
+          "step_id": 2,
+          "description": "Apply the rule for multiplying integers with different signs: when one of the multiplier or the multiplicand is positive and the other is negative, their product is negative[cite: 355].",
+          "concept": "integer_multiplication_rules"
+        },
+        {
+          "step_id": 3,
+          "description": "Multiply the magnitudes of the numbers (4 × 6 = 24) and apply the negative sign to get the final product: -24[cite: 355].",
+          "concept": "final_calculation"
+        }
+      ]
+    },
+    "alternative_solutions": [
+      {
+        "method": "Token / Repeated Addition Method",
+        "steps": [
+          "Start with an empty bag[cite: 166].",
+          "Interpret the expression as placing 6 negative tokens into the empty bag 4 times[cite: 167].",
+          "Count the total number of negative tokens: 6 + 6 + 6 + 6 = 24 negative tokens, meaning -24[cite: 169]."
+        ]
+      }
+    ],
+    "common_mistakes": [
+      "Ignoring the negative sign and outputting 24.",
+      "Adding the numbers instead of multiplying, resulting in -2."
+    ],
+    "required_concepts": [
+      "integer_multiplication",
+      "sign_rules"
+    ]
+  }
+  {
+    "problem_id": "integer_word_problem_02",
+    "topic": "Operations with Integers (Word Problems)",
+    "difficulty": "moderately hard",
+    "question": "In a test, (+4) marks are given for every correct answer and (-2) marks are given for every incorrect answer. Anil scored (-10) marks even though he had 5 correct answers. How many of his answers were incorrect?",
+    "final_answer": "15",
+    "canonical_solution": {
+      "steps": [
+        {
+          "step_id": 1,
+          "description": "Identify the scoring system: (+4) marks are given for every correct answer and (-2) marks are given for every incorrect answer[cite: 701].",
+          "concept": "information_extraction"
+        },
+        {
+          "step_id": 2,
+          "description": "Calculate the total marks Anil received for his correct answers. He had 5 correct answers[cite: 704], so 5 × 4 = 20 marks.",
+          "concept": "positive_score_calculation"
+        },
+        {
+          "step_id": 3,
+          "description": "Determine the marks Anil received for his incorrect answers. Subtract his correct answer marks from his final score: -10 - 20 = -30 marks[cite: 704].",
+          "concept": "integer_subtraction"
+        },
+        {
+          "step_id": 4,
+          "description": "Divide the total marks from incorrect answers by the penalty per incorrect answer to find the quantity: -30 ÷ -2[cite: 701, 704].",
+          "concept": "setting_up_division"
+        },
+        {
+          "step_id": 5,
+          "description": "Apply the division rule for negative integers where the quotient is positive when both the dividend and divisor are negative (-a ÷ -b = a ÷ b)[cite: 534, 794, 796]. Thus, -30 ÷ -2 = 15.",
+          "concept": "integer_division"
+        }
+      ]
+    },
+    "alternative_solutions": [
+      {
+        "method": "Algebraic Equation",
+        "steps": [
+          "Let x be the number of incorrect answers.",
+          "Set up the equation based on the total score: (5 × 4) + (x × -2) = -10[cite: 701, 704].",
+          "Simplify the equation: 20 - 2x = -10.",
+          "Isolate x: -2x = -30, so x = 15."
+        ]
+      }
+    ],
+    "common_mistakes": [
+      "Adding 20 and 10 instead of subtracting, leading to an incorrect intermediate step.",
+      "Forgetting that dividing a negative by a negative results in a positive number[cite: 796].",
+      "Dividing the final score (-10) directly by (-2) without accounting for the correct answers."
+    ],
+    "required_concepts": [
+      "integer_multiplication",
+      "integer_subtraction",
+      "integer_division",
+      "algebraic_thinking"
+    ]
+}

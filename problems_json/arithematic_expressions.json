@@ -100,3 +100,106 @@
     "multiplication_strategies"
   ]
 }
+{
+    "problem_id": "arith_compare_expr_01",
+    "topic": "Arithmetic Expressions (Comparing Expressions)",
+    "difficulty": "easy",
+    "question": "Compare the expressions 113 - 25 and 112 - 24 without performing the full subtraction. Which expression is greater, or are they equal?",
+    "final_answer": "They are equal.",
+    "canonical_solution": {
+      "steps": [
+        {
+          "step_id": 1,
+          "description": " Look at the starting numbers: 113 is 1 more than 112[cite: 3117].",
+          "concept": "comparing_starting_values"
+        },
+        {
+          "step_id": 2,
+          "description": "Look at the numbers being subtracted: 25 is 1 more than 24[cite: 3118].",
+          "concept": "comparing_subtrahends"
+        },
+        {
+          "step_id": 3,
+          "description": "Since the first expression starts with a number that is 1 greater, but also subtracts a number that is 1 greater, the differences balance out[cite: 3119].",
+          "concept": "logical_balancing"
+        },
+        {
+          "step_id": 4,
+          "description": "Therefore, the two expressions have an equal value[cite: 3120, 3139].",
+          "concept": "final_conclusion"
+        }
+      ]
+    },
+    "alternative_solutions": [
+      {
+        "method": "Direct Computation",
+        "steps": [
+          "Calculate the first expression: 113 - 25 = 88",
+          "Calculate the second expression: 112 - 24 = 88",
+          "Compare the results: 88 is equal to 88."
+        ]
+      }
+    ],
+    "common_mistakes": [
+      "Guessing that 113 - 25 is greater simply because 113 is the largest number.",
+      "Subtracting incorrectly and getting different results for the two expressions."
+    ],
+    "required_concepts": [
+      "comparing_expressions",
+      "logical_reasoning"
+    ]
+  }
+  {
+    "problem_id": "arith_remove_brackets_01",
+    "topic": "Arithmetic Expressions (Removing Brackets)",
+    "difficulty": "medium",
+    "question": "Evaluate the expression 500 - (250 - 100) by first rewriting it without brackets.",
+    "final_answer": "350",
+    "canonical_solution": {
+      "steps": [
+        {
+          "step_id": 1,
+          "description": "Identify the expression and notice that the brackets are preceded by a negative sign[cite: 3448].",
+          "concept": "identifying_operations"
+        },
+        {
+          "step_id": 2,
+          "description": "[Image illustrating the mathematical rule for removing brackets preceded by a negative sign] When removing brackets preceded by a negative sign, the signs of the terms inside the brackets change[cite: 3443, 3455].",
+          "concept": "bracket_removal_rule"
+        },
+        {
+          "step_id": 3,
+          "description": "Inside the brackets, the positive 250 changes to -250, and the negative 100 changes to +100[cite: 3456].",
+          "concept": "applying_sign_change"
+        },
+        {
+          "step_id": 4,
+          "description": "Rewrite the expression without brackets: 500 - 250 + 100[cite: 3453, 3454].",
+          "concept": "expression_rewriting"
+        },
+        {
+          "step_id": 5,
+          "description": "Calculate the final value from left to right: 500 - 250 = 250, and 250 + 100 = 350[cite: 3449, 3450].",
+          "concept": "final_calculation"
+        }
+      ]
+    },
+    "alternative_solutions": [
+      {
+        "method": "Evaluating Brackets First",
+        "steps": [
+          "Solve the operation inside the brackets first: 250 - 100 = 150[cite: 3449].",
+          "Subtract that result from the starting number: 500 - 150 = 350[cite: 3450]."
+        ]
+      }
+    ],
+    "common_mistakes": [
+      "Removing the brackets without changing the sign of the second term, resulting in the incorrect expression 500 - 250 - 100.",
+      "Adding 250 and 100 together before subtracting from 500."
+    ],
+    "required_concepts": [
+      "removing_brackets",
+      "sign_changes",
+      "order_of_operations"
+    ]
+  }
