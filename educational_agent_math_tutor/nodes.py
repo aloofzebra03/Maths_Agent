@@ -22,6 +22,7 @@ from educational_agent_math_tutor.schemas import (
     ConceptCheckResponse,
     ApproachAssessmentResponse,
     ConceptEvaluationResponse,
+    StartAnswerCheckResponse,
 )
 from educational_agent_math_tutor.prompts import (
     START_SYSTEM_PROMPT,
@@ -48,6 +49,9 @@ from educational_agent_math_tutor.prompts import (
     CONCEPT_EVALUATE_USER_TEMPLATE_EARLY,
     CONCEPT_EVALUATE_SYSTEM_PROMPT_FINAL,
     CONCEPT_EVALUATE_USER_TEMPLATE_FINAL,
+    START_ANSWER_CHECK_SYSTEM_PROMPT,
+    START_ANSWER_CHECK_USER_TEMPLATE,
+    HANDLE_STEP_EXPLANATION_SYSTEM_PROMPT,
 )
 from educational_agent_math_tutor.config import (
     TA_THRESHOLD_HIGH,
@@ -149,12 +153,205 @@ def start_node(state: MathAgentState) -> Dict[str, Any]:
         "post_concept_reassessment": False,
         "asked_concept": False,
         "concept_tries": 0,
+        # Start-node answer check fields
+        "start_attempt_count": 0,
+        "awaiting_step_explanation": False,
+        "final_answer": final_answer,
     }
+
+
+# ============================================================================
+# CHECK ANSWER NODE (quick-check right after START)
+# ============================================================================
+
+def check_answer_node(state: MathAgentState) -> Dict[str, Any]:
+    """
+    CHECK_ANSWER node: Evaluate student's first attempt at the problem.
+
+    - Attempt 1 wrong: say 'That is incorrect', give a hint, stay in CHECK_ANSWER
+    - Attempt 2 wrong: say 'That is incorrect', route to normal ASSESSMENT flow
+    - Correct (any attempt): congratulate and ask about step explanation
+
+    The correct answer is passed to the LLM in context ONLY — never revealed.
+    """
+    print("\n" + "="*60)
+    print("✅ CHECK ANSWER NODE")
+    print("="*60)
+
+    messages = state.get("messages", [])
+    problem = state["problem"]
+    final_answer = state.get("final_answer", "")
+    attempt = state.get("start_attempt_count", 0) + 1  # increment for this attempt
+
+    # Get student's latest response
+    user_input = None
+    for msg in reversed(messages):
+        if isinstance(msg, HumanMessage):
+            user_input = msg.content
+            break
+
+    if not user_input:
+        print("⚠️ No user input found")
+        return {"current_state": "CHECK_ANSWER"}
+
+    print(f"📝 Attempt {attempt}/2 — evaluating student answer")
+
+    # Build prompt
+    parser = PydanticOutputParser(pydantic_object=StartAnswerCheckResponse)
+    format_instructions = parser.get_format_instructions()
+
+    user_msg = START_ANSWER_CHECK_USER_TEMPLATE.format(
+        problem=problem,
+        final_answer=final_answer,
+        student_response=user_input,
+        attempt_number=attempt,
+    )
+
+    system_prompt = START_ANSWER_CHECK_SYSTEM_PROMPT
+    if state.get("is_kannada", False):
+        system_prompt += "\n\nIMPORTANT: Respond ONLY in Kannada."
+    else:
+        system_prompt += "\n\nIMPORTANT: Respond ONLY in English."
+
+    check_messages = build_messages_with_history(
+        state=state,
+        system_prompt=system_prompt,
+        user_prompt=user_msg,
+        format_instructions=format_instructions,
+    )
+
+    response = invoke_llm_with_fallback(check_messages, "CHECK_ANSWER")
+
+    # Parse response
+    try:
+        json_str = extract_json_block(response.content)
+        check_resp = parser.parse(json_str)
+    except Exception as e:
+        print(f"❌ Parse error: {e}")
+        check_resp = StartAnswerCheckResponse(
+            is_correct=False,
+            feedback="That is incorrect. Let's work through this together.",
+        )
+
+    feedback = translate_if_kannada(state, check_resp.feedback)
+    messages.append(AIMessage(content=feedback))
+
+    if check_resp.is_correct:
+        print("✅ Correct! Asking about step explanation.")
+        return {
+            "start_attempt_count": attempt,
+            "awaiting_step_explanation": True,
+            "agent_output": feedback,
+            "messages": messages,
+            "current_state": "CHECK_ANSWER",
+        }
+    elif attempt >= 2:
+        print("❌ Wrong on attempt 2 — proceeding to normal flow.")
+        return {
+            "start_attempt_count": attempt,
+            "awaiting_step_explanation": False,
+            "agent_output": feedback,
+            "messages": messages,
+            "current_state": "CHECK_ANSWER",
+        }
+    else:
+        print(f"❌ Wrong on attempt {attempt} — staying for retry.")
+        return {
+            "start_attempt_count": attempt,
+            "awaiting_step_explanation": False,
+            "agent_output": feedback,
+            "messages": messages,
+            "current_state": "CHECK_ANSWER",
+        }
+
+
+# ============================================================================
+# HANDLE STEP EXPLANATION NODE
+# ============================================================================
+
+def handle_step_explanation_node(state: MathAgentState) -> Dict[str, Any]:
+    """
+    HANDLE_STEP_EXPLANATION node: Student answered correctly at start.
+    Reads their yes/no to step explanation and routes accordingly.
+
+    - Yes → proceed to ASSESSMENT (normal tutoring flow)
+    - No  → proceed to REFLECTION → END
+    """
+    print("\n" + "="*60)
+    print("📖 HANDLE STEP EXPLANATION NODE")
+    print("="*60)
+
+    messages = state.get("messages", [])
+
+    # Get student's reply
+    user_input = None
+    for msg in reversed(messages):
+        if isinstance(msg, HumanMessage):
+            user_input = msg.content
+            break
+
+    if not user_input:
+        print("⚠️ No user input found")
+        return {"current_state": "HANDLE_STEP_EXPLANATION"}
+
+    lang_note = "IMPORTANT: Respond ONLY in Kannada." if state.get("is_kannada", False) else "IMPORTANT: Respond ONLY in English."
+
+    # Combine system + user into one HumanMessage so fallback models (e.g. Gemma)
+    # that don't support SystemMessage work correctly.
+    combined_prompt = (
+        f"{HANDLE_STEP_EXPLANATION_SYSTEM_PROMPT}\n{lang_note}\n\n"
+        f"Student replied: {user_input}"
+    )
+    step_messages = [HumanMessage(content=combined_prompt)]
+
+    response = invoke_llm_with_fallback(step_messages, "HANDLE_STEP_EXPLANATION")
+
+
+    # Parse the small JSON manually
+    wants_explanation = False
+    reply_text = ""
+    try:
+        json_str = extract_json_block(response.content)
+        parsed = json.loads(json_str)
+        wants_explanation = bool(parsed.get("wants_explanation", False))
+        reply_text = parsed.get("response", "")
+    except Exception as e:
+        print(f"❌ Parse error: {e}")
+        # Fallback: naive keyword check
+        lower = user_input.lower()
+        wants_explanation = any(w in lower for w in ["yes", "sure", "please", "explain", "walk"])
+        reply_text = "Great, let's go through it!" if wants_explanation else "Well done! You nailed it! 🎉"
+
+    translated_reply = translate_if_kannada(state, reply_text)
+    messages.append(AIMessage(content=translated_reply))
+
+    print(f"📊 wants_explanation={wants_explanation}")
+
+    if wants_explanation:
+        # Ask the student to describe their approach so ASSESS_APPROACH has input to evaluate
+        follow_up = translate_if_kannada(
+            state,
+            "Before I walk you through it — what do you think the steps involved are? Give it your best shot! 🙂"
+        )
+        messages.append(AIMessage(content=follow_up))
+        agent_out = follow_up
+    else:
+        agent_out = translated_reply
+
+    return {
+        "awaiting_step_explanation": False,
+        "wants_step_explanation": wants_explanation,
+        "agent_output": agent_out,
+        "messages": messages,
+        "current_state": "HANDLE_STEP_EXPLANATION",
+    }
+
 
 
 # ============================================================================
 # ASSESSMENT NODE
 # ============================================================================
+
 
 def assess_student_response(state: MathAgentState) -> Dict[str, Any]:
     """
@@ -231,7 +428,8 @@ def assess_student_response(state: MathAgentState) -> Dict[str, Any]:
         # Fallback to no missing concepts
         concept_check = ConceptCheckResponse(
             missing_concepts=[],
-            reasoning="Unable to parse concept check response"
+            reasoning="Unable to parse concept check response",
+            response_to_student="Thanks for sharing your thoughts! Let me take a look and we'll figure out the best way to tackle this problem together."
         )
     
     print(f"📊 Concept Check Results:")
@@ -243,9 +441,14 @@ def assess_student_response(state: MathAgentState) -> Dict[str, Any]:
     else:
         print(f"✅ All concepts understood, routing to ASSESS_APPROACH")
     
+    translated_message = translate_if_kannada(state, concept_check.response_to_student)
+    messages.append(AIMessage(content=translated_message))
+    
     return {
         "missing_concepts": concept_check.missing_concepts,
         "last_user_msg": user_input,
+        "agent_output": translated_message,
+        "messages": messages,
         "current_state": "ASSESSMENT",
     }
 

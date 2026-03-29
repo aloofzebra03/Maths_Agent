@@ -449,5 +449,6 @@ def build_messages_with_history(
         temp_messages.append(HumanMessage(content=f"\n\n{format_instructions}"))
     
     print(f"📊 Built message list: 1 system + {len(conversation_history)} history + 1 instruction + {1 if format_instructions else 0} format")
+    print(temp_messages)
     
     return temp_messages

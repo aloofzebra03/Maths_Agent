@@ -82,6 +82,13 @@ class MathAgentState(TypedDict, total=False):
     post_concept_reassessment: bool  # Flag: have we re-asked after teaching?
     asked_concept: bool  # Flag: have we presented the concept teaching?
     concept_tries: int  # Number of student attempts at micro-check (max 3)
+
+    # Start-node answer check
+    start_attempt_count: int  # How many times student tried at start (0, 1, 2)
+    awaiting_step_explanation: bool  # True when correct at start and waiting for step-explanation pref
+    wants_step_explanation: Optional[bool]  # Student's choice: True=wants steps, False=skip
+    final_answer: Optional[str]  # Correct answer stored for LLM context (never shown to student)
+
     
     # Message tracking
     messages: Annotated[List[AnyMessage], add_messages]
@@ -207,7 +214,7 @@ class ConceptResponse(BaseModel):
     """
     
     teaching_response: str = Field(
-        description="A natural, conversational response that teaches the concept warmly. Include explanation with examples and end with a question to check understanding. Remember we want the text to be minimal.Speak like a friendly tutor having a conversation, not a textbook."
+        description="A natural, conversational response that teaches the concept warmly. Include explanation with examples and end with a question to check understanding. Remember we want the text to be minimal.Speak like a friendly tutor having a conversation, not a textbook and continue on the previous conversaion and ensure you keep it to 2-3 sentences only."
     )
 
 
@@ -242,6 +249,16 @@ class ConceptCheckResponse(BaseModel):
     reasoning: str = Field(
         description="Brief explanation of which concepts are missing and why, based on student's response"
     )
+    
+    response_to_student: str = Field(
+        description=(
+            "A warm, encouraging message to send directly to the student. "
+            "If concepts are missing: acknowledge their response, warmly mention you'll cover the missing concepts together before solving the problem (name them naturally). "
+            "If no concepts are missing: praise their understanding and let them know you'll now look at their approach to the problem. "
+            "Keep it brief, friendly, and age-appropriate (Class 7 student)."
+        )
+    )
+
 
 
 class ApproachAssessmentResponse(BaseModel):
@@ -291,5 +308,27 @@ class ConceptEvaluationResponse(BaseModel):
     )
     
     response_to_student: str = Field(
-        description="Message to student. Either: (1) praise + confirmation if understood(Remember do NOT mention the original problem in any way whatsoever.Also do not say anything about moving on), OR (2) re-explanation + micro-check question again if not understood"
+        description="Message to student. Either: (1) praise + confirmation if understood(Remember do NOT mention the original problem in any way whatsoever.Also do not say anything about moving on), OR (2) re-explanation + micro-check question again if not understood.Ensure that your response is not more than 2-3 sentences."
+    )
+
+
+class StartAnswerCheckResponse(BaseModel):
+    """
+    Structured response for evaluating the student's answer at the very start.
+    The LLM is given the correct answer in its context ONLY — it must NEVER
+    reveal it to the student in feedback.
+    """
+
+    is_correct: bool = Field(
+        description="Whether the student's answer matches the correct answer."
+    )
+
+    feedback: str = Field(
+        description=(
+            "Short message (2-3 sentences max) sent directly to the student. "
+            "If correct: warm congratulations then ask 'Would you like me to walk through the steps, or shall we move on?'. "
+            "If wrong attempt 1: begin with 'That is incorrect.' if a numerical answer is given, then give ONE brief conceptual hint — do NOT reveal the answer but also encourage the student to try again and give the correct answer. "
+            "If wrong attempt 2: begin with 'That is incorrect.' if a numerical answer is given, then say you will work through it together.Do NOT reveal the answer.Do not give any further hints either.Just say that we will solve it together or something"
+            "NEVER include the correct answer value anywhere in this field."
+        )
     )

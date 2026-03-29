@@ -13,6 +13,8 @@ from langchain_core.messages import HumanMessage
 from educational_agent_math_tutor.schemas import MathAgentState
 from educational_agent_math_tutor.nodes import (
     start_node,
+    check_answer_node,
+    handle_step_explanation_node,
     assess_student_response,
     concept_node,
     re_ask_start_questions_node,
@@ -128,18 +130,53 @@ def create_node_wrapper(node_func, node_name: str):
 def route_after_initial_assessment(state: MathAgentState) -> Literal["concept", "assess_approach"]:
     """
     Route from ASSESSMENT based on whether student knows required concepts.
-    
+
     Returns:
         "concept" if missing_concepts detected, else "assess_approach"
     """
     missing_concepts = state.get("missing_concepts", [])
-    
+
     if missing_concepts:
         print(f"📚 Concepts missing: {missing_concepts}. Routing to CONCEPT node")
         return "concept"
     else:
         print("✅ All concepts understood. Routing to ASSESS_APPROACH")
         return "assess_approach"
+
+
+def route_after_check_answer(state: MathAgentState) -> Literal["check_answer", "handle_step_explanation", "assessment"]:
+    """
+    Route from CHECK_ANSWER node.
+
+    - awaiting_step_explanation=True  → student answered correctly → ask about steps
+    - start_attempt_count >= 2        → two wrong attempts → normal flow
+    - else                            → retry (wrong attempt 1)
+    """
+    if state.get("awaiting_step_explanation", False):
+        print("✅ Correct answer — routing to HANDLE_STEP_EXPLANATION")
+        return "handle_step_explanation"
+    elif state.get("start_attempt_count", 0) >= 2:
+        print("❌ Two wrong attempts — routing to ASSESSMENT")
+        return "assessment"
+    else:
+        print("🔄 Wrong attempt 1 — looping back to CHECK_ANSWER for retry")
+        return "check_answer"
+
+
+def route_after_step_explanation(state: MathAgentState) -> Literal["assess_approach", "reflection"]:
+    """
+    Route from HANDLE_STEP_EXPLANATION.
+
+    - wants_step_explanation=True  → ask approach → ASSESS_APPROACH (student already correct, skip concept check)
+    - wants_step_explanation=False → skip to REFLECTION → END
+    """
+    if state.get("wants_step_explanation", False):
+        print("📚 Student wants explanation — routing to ASSESS_APPROACH")
+        return "assess_approach"
+    else:
+        print("⏭️ Student wants to skip — routing to REFLECTION")
+        return "reflection"
+
 
 
 def route_after_concept(state: MathAgentState) -> Literal["concept", "re_ask"]:
@@ -214,6 +251,8 @@ def create_graph():
     
     # Add wrapped nodes
     workflow.add_node("START", create_node_wrapper(start_node, "START"))
+    workflow.add_node("CHECK_ANSWER", create_node_wrapper(check_answer_node, "CHECK_ANSWER"))
+    workflow.add_node("HANDLE_STEP_EXPLANATION", create_node_wrapper(handle_step_explanation_node, "HANDLE_STEP_EXPLANATION"))
     workflow.add_node("ASSESSMENT", create_node_wrapper(assess_student_response, "ASSESSMENT"))
     workflow.add_node("CONCEPT", create_node_wrapper(concept_node, "CONCEPT"))
     workflow.add_node("RE_ASK", create_node_wrapper(re_ask_start_questions_node, "RE_ASK"))
@@ -224,11 +263,37 @@ def create_graph():
     
     # Define edges
     workflow.set_entry_point("START")
-    
-    # START → ASSESSMENT
-    # Graph will interrupt after START, wait for student response, then continue to ASSESSMENT
-    workflow.add_edge("START", "ASSESSMENT")
-    
+
+    # START → CHECK_ANSWER (student's first response goes here)
+    workflow.add_edge("START", "CHECK_ANSWER")
+
+    # CHECK_ANSWER → conditional
+    #   correct            → HANDLE_STEP_EXPLANATION
+    #   wrong attempt 1    → CHECK_ANSWER (self-loop for retry)
+    #   wrong attempt 2    → ASSESSMENT (normal flow)
+    workflow.add_conditional_edges(
+        "CHECK_ANSWER",
+        route_after_check_answer,
+        {
+            "check_answer": "CHECK_ANSWER",
+            "handle_step_explanation": "HANDLE_STEP_EXPLANATION",
+            "assessment": "ASSESSMENT",
+        }
+    )
+
+    # HANDLE_STEP_EXPLANATION → conditional
+    #   wants explanation → ASSESS_APPROACH (student already correct, skip concept check)
+    #   skip             → REFLECTION
+    workflow.add_conditional_edges(
+        "HANDLE_STEP_EXPLANATION",
+        route_after_step_explanation,
+        {
+            "assess_approach": "ASSESS_APPROACH",
+            "reflection": "REFLECTION",
+        }
+    )
+
+
     # ASSESSMENT → conditional (CONCEPT or ASSESS_APPROACH)
     # Based on whether student knows required concepts
     workflow.add_conditional_edges(
@@ -278,14 +343,14 @@ def create_graph():
     
     # Compile with MemorySaver checkpointer
     checkpointer = InMemorySaver()
-    
+
     graph = workflow.compile(
         checkpointer=checkpointer,
-        interrupt_after=["START", "ADAPTIVE_SOLVER", "RE_ASK", "CONCEPT","REFLECTION"]  # Pause for student input
+        interrupt_after=["START", "CHECK_ANSWER", "HANDLE_STEP_EXPLANATION", "ASSESSMENT", "ADAPTIVE_SOLVER", "RE_ASK", "CONCEPT", "REFLECTION"]
     )
-    
+
     print("✅ Graph compiled successfully")
-    print("🔄 Human-in-the-loop enabled at: START, CONCEPT, RE_ASK, ADAPTIVE_SOLVER")
+    print("🔄 Human-in-the-loop enabled at: START, CHECK_ANSWER, HANDLE_STEP_EXPLANATION, ASSESSMENT, CONCEPT, RE_ASK, ADAPTIVE_SOLVER")
     
     return graph
 
