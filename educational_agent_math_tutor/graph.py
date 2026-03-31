@@ -320,7 +320,7 @@ def create_graph():
     # After re-asking, assess the student's new response
     workflow.add_edge("RE_ASK", "ASSESS_APPROACH")
     
-    # ASSESS_APPROACH → ADAPTIVE_SOLVER (always)
+    # ASSESS_APPROACH → `ADAPTIVE_SOLVER` (always)
     # After scoring Tu/Ta, route to appropriate mode
     workflow.add_edge("ASSESS_APPROACH", "ADAPTIVE_SOLVER")
     
@@ -345,7 +345,7 @@ def create_graph():
     checkpointer = InMemorySaver()
 
     graph = workflow.compile(
-        checkpointer=checkpointer,
+        # checkpointer=checkpointer,
         interrupt_after=["START", "CHECK_ANSWER", "HANDLE_STEP_EXPLANATION", "ASSESSMENT", "ADAPTIVE_SOLVER", "RE_ASK", "CONCEPT", "REFLECTION"]
     )
 

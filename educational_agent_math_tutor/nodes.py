@@ -5,10 +5,9 @@ Contains all pedagogical nodes: START, ASSESSMENT, ADAPTIVE_SOLVER, REFLECTION.
 """
 
 import json
-from pyexpat.errors import messages
 from typing import Dict, Any
 from datetime import datetime
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from langchain_core.messages import HumanMessage, AIMessage
 from langchain_core.output_parsers import PydanticOutputParser
 
 from educational_agent_math_tutor.schemas import (
@@ -52,6 +51,7 @@ from educational_agent_math_tutor.prompts import (
     START_ANSWER_CHECK_SYSTEM_PROMPT,
     START_ANSWER_CHECK_USER_TEMPLATE,
     HANDLE_STEP_EXPLANATION_SYSTEM_PROMPT,
+    HANDLE_STEP_EXPLANATION_USER_TEMPLATE,
 )
 from educational_agent_math_tutor.config import (
     TA_THRESHOLD_HIGH,
@@ -113,15 +113,11 @@ def start_node(state: MathAgentState) -> Dict[str, Any]:
     greeting = START_GREETING_TEMPLATE.format(problem=question)
     translated_greeting = translate_if_kannada(state, greeting)
     
-    # Build system message with tutor persona
-    system_prompt_content = START_SYSTEM_PROMPT
-    if state.get("is_kannada", False):
-        system_prompt_content += "\n\nIMPORTANT: You must respond ONLY in Kannada language. All your responses must be in Kannada script, not English."
-    else:
-        system_prompt_content += "\n\nIMPORTANT: You must respond ONLY in English. All your responses must be in English, not Kannada or any other language."
-        
+    # Store only the AI greeting in messages.
+    # Do NOT store a SystemMessage in state — each node adds its own fresh system
+    # prompt via build_messages_with_history. Storing a START SystemMessage here
+    # would cause every downstream LLM call to receive TWO conflicting system prompts.
     messages = [
-        SystemMessage(content=system_prompt_content),
         AIMessage(content=translated_greeting)
     ]
     
@@ -207,15 +203,9 @@ def check_answer_node(state: MathAgentState) -> Dict[str, Any]:
         attempt_number=attempt,
     )
 
-    system_prompt = START_ANSWER_CHECK_SYSTEM_PROMPT
-    if state.get("is_kannada", False):
-        system_prompt += "\n\nIMPORTANT: Respond ONLY in Kannada."
-    else:
-        system_prompt += "\n\nIMPORTANT: Respond ONLY in English."
-
     check_messages = build_messages_with_history(
         state=state,
-        system_prompt=system_prompt,
+        system_prompt=START_ANSWER_CHECK_SYSTEM_PROMPT,
         user_prompt=user_msg,
         format_instructions=format_instructions,
     )
@@ -294,18 +284,15 @@ def handle_step_explanation_node(state: MathAgentState) -> Dict[str, Any]:
         print("⚠️ No user input found")
         return {"current_state": "HANDLE_STEP_EXPLANATION"}
 
-    lang_note = "IMPORTANT: Respond ONLY in Kannada." if state.get("is_kannada", False) else "IMPORTANT: Respond ONLY in English."
+    user_msg = HANDLE_STEP_EXPLANATION_USER_TEMPLATE.format(student_reply=user_input)
 
-    # Combine system + user into one HumanMessage so fallback models (e.g. Gemma)
-    # that don't support SystemMessage work correctly.
-    combined_prompt = (
-        f"{HANDLE_STEP_EXPLANATION_SYSTEM_PROMPT}\n{lang_note}\n\n"
-        f"Student replied: {user_input}"
+    step_messages = build_messages_with_history(
+        state=state,
+        system_prompt=HANDLE_STEP_EXPLANATION_SYSTEM_PROMPT,
+        user_prompt=user_msg,
     )
-    step_messages = [HumanMessage(content=combined_prompt)]
 
     response = invoke_llm_with_fallback(step_messages, "HANDLE_STEP_EXPLANATION")
-
 
     # Parse the small JSON manually
     wants_explanation = False
@@ -331,7 +318,7 @@ def handle_step_explanation_node(state: MathAgentState) -> Dict[str, Any]:
         # Ask the student to describe their approach so ASSESS_APPROACH has input to evaluate
         follow_up = translate_if_kannada(
             state,
-            "Before I walk you through it — what do you think the steps involved are? Give it your best shot! 🙂"
+            "Before I walk you through it — what do you think the steps involved are? Give it your best shot!"
         )
         messages.append(AIMessage(content=follow_up))
         agent_out = follow_up
@@ -399,19 +386,21 @@ def assess_student_response(state: MathAgentState) -> Dict[str, Any]:
     # Build concept check prompt
     parser = PydanticOutputParser(pydantic_object=ConceptCheckResponse)
     format_instructions = parser.get_format_instructions()
-    
+
     concept_check_user_msg = CONCEPT_CHECK_USER_TEMPLATE.format(
         problem=problem,
         required_concepts=required_concepts,
         user_input=user_input
     )
-    
+
     # Build messages with conversation history
+    # remove_problem_messages=False: keep the full dialogue visible so the LLM
+    # can accurately judge what the student said about the problem.
     concept_check_messages = build_messages_with_history(
         state=state,
         system_prompt=CONCEPT_CHECK_SYSTEM_PROMPT,
         user_prompt=concept_check_user_msg,
-        format_instructions=format_instructions
+        format_instructions=format_instructions,
     )
     
     # Invoke LLM
@@ -479,8 +468,9 @@ def concept_node(state: MathAgentState) -> Dict[str, Any]:
     print("="*60)
     
     messages = state.get("messages", [])
-    # problem = state["problem"]
-    problem = None
+    # We intentionally do NOT expose the problem to concept teaching logic,
+    # but we keep a reference here for the forced-final-try prompt only.
+    problem = state.get("problem", "")
     missing_concepts = state.get("missing_concepts", [])
     concepts_taught = state.get("concepts_taught", [])
     concept_visit_count = state.get("concept_visit_count", {})
@@ -638,18 +628,22 @@ def concept_node(state: MathAgentState) -> Dict[str, Any]:
     if eval_resp.next_state == "move_on":
         # Student understood OR max tries reached
         print(f"✅ Moving on from concept: {current_concept}")
-        
+
         # Add to concepts taught if not already there
         if current_concept not in concepts_taught:
             concepts_taught.append(current_concept)
-        
+
         # Remove from missing concepts
         remaining_concepts = missing_concepts[1:]
-        
+
         # Reset flags for next concept
         if remaining_concepts:
-            ai_message += f"\n\n Let's move on to the next concept: {remaining_concepts[0].replace('_', ' ').title()}."
-            translated_message = translate_if_kannada(state, ai_message)
+            # Build transition message entirely in English first, then translate.
+            # Do NOT concatenate English strings directly into ai_message if ai_message
+            # is already translated — translate each piece independently.
+            next_concept_name = remaining_concepts[0].replace('_', ' ').title()
+            transition_suffix = f" Now let's look at {next_concept_name}."
+            translated_message = translate_if_kannada(state, ai_message + transition_suffix)
             messages.append(AIMessage(content=translated_message))
             print(f"📚 Next concept: {remaining_concepts[0]}")
             return {
@@ -662,10 +656,10 @@ def concept_node(state: MathAgentState) -> Dict[str, Any]:
                 "current_state": "CONCEPT",
             }
         else:
-            # All concepts done
+            # All concepts done — translate the whole final message as one unit
             print("✅ All concepts taught!")
-            ai_message += "\n\n You've understood all the prerequisite concepts. Let's get back to solving the main problem."
-            translated_message = translate_if_kannada(state, ai_message)
+            done_suffix = " Great work — you've got the building blocks. Let me now ask you about the problem again."
+            translated_message = translate_if_kannada(state, ai_message + done_suffix)
             messages.append(AIMessage(content=translated_message))
             return {
                 "missing_concepts": [],
@@ -713,37 +707,30 @@ def re_ask_start_questions_node(state: MathAgentState) -> Dict[str, Any]:
     problem = state["problem"]
     concepts_taught = state.get("concepts_taught", [])
     
-    # Build re-ask prompt
-    parser = PydanticOutputParser(pydantic_object=str)  # Simple string response
-    
+    # Build re-ask prompt using build_messages_with_history so the LLM has
+    # the full concept-teaching dialogue as context.
     re_ask_user_msg = RE_ASK_USER_TEMPLATE.format(
         problem=problem,
         concepts_taught=", ".join(concepts_taught) if concepts_taught else "some key concepts"
     )
-    
-    # Build messages
-    system_prompt_content = RE_ASK_SYSTEM_PROMPT
-    if state.get("is_kannada", False):
-        system_prompt_content += "\n\nIMPORTANT: You must respond ONLY in Kannada language. All your responses must be in Kannada script, not English."
-    else:
-        system_prompt_content += "\n\nIMPORTANT: You must respond ONLY in English. All your responses must be in English, not Kannada or any other language."
 
-    re_ask_messages = [
-        HumanMessage(content="Re-asking the same START questions after teaching concepts."),
-        SystemMessage(content=system_prompt_content),
-        HumanMessage(content=re_ask_user_msg)
-    ]
-    
+    re_ask_messages = build_messages_with_history(
+        state=state,
+        system_prompt=RE_ASK_SYSTEM_PROMPT,
+        user_prompt=re_ask_user_msg,
+        remove_problem_messages=True  # Strip stale START SystemMessage from history
+    )
+
     # Invoke LLM
     print(f"🤖 Calling LLM to re-ask questions after teaching: {concepts_taught}")
     response = invoke_llm_with_fallback(re_ask_messages, "RE_ASK")
-    
+
     response_message = response.content
     translated_message = translate_if_kannada(state, response_message)
     messages.append(AIMessage(content=translated_message))
-    
+
     print("✅ Re-asked START questions")
-    
+
     return {
         "agent_output": translated_message,
         "messages": messages,
@@ -1069,8 +1056,15 @@ def _guided_logic(state: MathAgentState) -> Dict[str, Any]:
             encouragement="You're on the right track!"
         )
     
-    # Build response message
-    response_message = f"{guided_resp.acknowledgment}\n\n{guided_resp.missing_piece}\n\n{guided_resp.hint}\n\n{guided_resp.encouragement}"
+    # Build response message as a flowing, conversational paragraph
+    # Rather than four separate blocks separated by newlines, weave them together
+    # so the tutor sounds natural, not like a form being filled out.
+    response_message = (
+        f"{guided_resp.acknowledgment} "
+        f"{guided_resp.missing_piece} "
+        f"{guided_resp.hint} "
+        f"{guided_resp.encouragement}"
+    )
     translated_message = translate_if_kannada(state, response_message)
     
     messages.append(AIMessage(content=translated_message))
@@ -1132,7 +1126,10 @@ def _scaffold_logic(state: MathAgentState) -> Dict[str, Any]:
     if user_input and retry_count >= MAX_SCAFFOLD_RETRIES:
         print("⏭️ Max retries reached, giving answer and moving to next step")
         
-        answer_message = f"That's okay! Let me help you with this step.\n\n**Step {step_index + 1}:** {step_description}\n\nLet's move on to the next step!"
+        answer_message = (
+            f"That's okay, no worries! Here's how this step works: {step_description} "
+            f"Let's keep going — you're doing well!"
+        )
         translated_message = translate_if_kannada(state, answer_message)
         messages.append(AIMessage(content=translated_message))
         
@@ -1182,16 +1179,19 @@ def _scaffold_logic(state: MathAgentState) -> Dict[str, Any]:
             check_question="Can you do this step?"
         )
     
-    # Build response message
-    response_parts = [
-        f"**Step {step_index + 1}:** {scaffold_resp.step_context}",
-        f"\n{scaffold_resp.step_instruction}"
-    ]
-    
+    # Build response as a conversational, flowing message — no markdown headers.
+    # The tutor should sound warm and human, not like a formatted document.
     if scaffold_resp.check_question:
-        response_parts.append(f"\n{scaffold_resp.check_question}")
-    
-    response_message = "\n".join(response_parts)
+        response_message = (
+            f"{scaffold_resp.step_context} "
+            f"{scaffold_resp.step_instruction} "
+            f"{scaffold_resp.check_question}"
+        )
+    else:
+        response_message = (
+            f"{scaffold_resp.step_context} "
+            f"{scaffold_resp.step_instruction}"
+        )
     translated_message = translate_if_kannada(state, response_message)
     messages.append(AIMessage(content=translated_message))
     
