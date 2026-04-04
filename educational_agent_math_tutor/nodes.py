@@ -16,12 +16,14 @@ from educational_agent_math_tutor.schemas import (
     CoachResponse,
     GuidedResponse,
     ScaffoldResponse,
+    ScaffoldRevealResponse,
     ConceptResponse,
     ReflectionResponse,
     ConceptCheckResponse,
     ApproachAssessmentResponse,
     ConceptEvaluationResponse,
     StartAnswerCheckResponse,
+    HandleSummaryResponse,
 )
 from educational_agent_math_tutor.prompts import (
     START_SYSTEM_PROMPT,
@@ -34,6 +36,8 @@ from educational_agent_math_tutor.prompts import (
     GUIDED_USER_TEMPLATE,
     SCAFFOLD_SYSTEM_PROMPT,
     SCAFFOLD_USER_TEMPLATE,
+    SCAFFOLD_REVEAL_SYSTEM_PROMPT,
+    SCAFFOLD_REVEAL_USER_TEMPLATE,
     CONCEPT_SYSTEM_PROMPT,
     CONCEPT_USER_TEMPLATE,
     REFLECTION_SYSTEM_PROMPT,
@@ -52,6 +56,8 @@ from educational_agent_math_tutor.prompts import (
     START_ANSWER_CHECK_USER_TEMPLATE,
     HANDLE_STEP_EXPLANATION_SYSTEM_PROMPT,
     HANDLE_STEP_EXPLANATION_USER_TEMPLATE,
+    HANDLE_SUMMARY_REQUEST_SYSTEM_PROMPT,
+    HANDLE_SUMMARY_REQUEST_USER_TEMPLATE,
 )
 from educational_agent_math_tutor.config import (
     TA_THRESHOLD_HIGH,
@@ -1078,33 +1084,34 @@ def _guided_logic(state: MathAgentState) -> Dict[str, Any]:
 
 def _scaffold_logic(state: MathAgentState) -> Dict[str, Any]:
     """
-    SCAFFOLD mode: Provide one concrete operation per step.
-    
-    - Give explicit instruction for current step
-    - Check understanding before moving to next step
-    - If student fails MAX_SCAFFOLD_RETRIES times on same step:
-      - Give them the answer for that step
-      - Move to next step
+    SCAFFOLD mode: Guide student step-by-step, checking each answer before advancing.
+
+    State machine driven by scaffold_retry_count:
+      - retry_count == 0  → First time on this step: present instruction + check question
+      - retry_count >= 1  → Student answered: LLM evaluates and responds in same call
+        - should_advance=True  → step_index+1, retry_count reset to 0
+        - should_advance=False AND retry_count < MAX → retry_count+1, stay on step
+        - should_advance=False AND retry_count >= MAX → reveal answer, advance step
     """
     print("\n🪜 SCAFFOLD MODE")
-    
+
     messages = state.get("messages", [])
     problem = state["problem"]
     steps = state.get("steps", [])
     step_index = state.get("step_index", 0)
     retry_count = state.get("scaffold_retry_count", 0)
-    
-    # Get user's latest response
+
+    # Get user's latest response (may be None on the very first scaffold call)
     user_input = None
     for msg in reversed(messages):
         if isinstance(msg, HumanMessage):
             user_input = msg.content
             break
-    
-    # Check if we've completed all steps
+
+    # ── All steps done ────────────────────────────────────────────────────────
     if step_index >= len(steps):
         print("✅ All steps completed!")
-        completion_message = "Excellent work! You've completed all the steps. You solved the problem! 🎉"
+        completion_message = "You did it! You've worked through every single step — that's the complete solution! 🎉 I'm really proud of you."
         translated_message = translate_if_kannada(state, completion_message)
         messages.append(AIMessage(content=translated_message))
         return {
@@ -1113,101 +1120,138 @@ def _scaffold_logic(state: MathAgentState) -> Dict[str, Any]:
             "messages": messages,
             "current_state": "ADAPTIVE_SOLVER",
         }
-    
+
     current_step = steps[step_index]
     step_description = current_step.get("description", "")
     step_concept = current_step.get("concept", "general")
-    
-    print(f"📍 Current step: {step_index + 1}/{len(steps)}")
-    print(f"📝 Step: {step_description}")
-    print(f"🔄 Retry count: {retry_count}/{MAX_SCAFFOLD_RETRIES}")
-    
-    # Check if we should give the answer and move on
-    if user_input and retry_count >= MAX_SCAFFOLD_RETRIES:
-        print("⏭️ Max retries reached, giving answer and moving to next step")
-        
+
+    # Determine mode: first instruction vs evaluation
+    is_first_instruction = (retry_count == 0)
+
+    print(f"📍 Step {step_index + 1}/{len(steps)} | retry_count={retry_count} | first={is_first_instruction}")
+
+    # ── Max retries reached on this step: reveal and move on ─────────────────
+    if not is_first_instruction and retry_count >= MAX_SCAFFOLD_RETRIES:
+        print("⏭️ Max retries reached — revealing step answer")
+
+        reveal_parser = PydanticOutputParser(pydantic_object=ScaffoldRevealResponse)
+        reveal_format_instructions = reveal_parser.get_format_instructions()
+
+        reveal_user_msg = SCAFFOLD_REVEAL_USER_TEMPLATE.format(
+            problem=problem,
+            step_index=step_index + 1,
+            current_step=step_description,
+            step_concept=step_concept,
+            retry_count=retry_count,
+        )
+
+        reveal_messages = build_messages_with_history(
+            state=state,
+            system_prompt=SCAFFOLD_REVEAL_SYSTEM_PROMPT,
+            user_prompt=reveal_user_msg,
+            format_instructions=reveal_format_instructions,
+        )
+
+        print("🤖 Calling LLM for scaffold reveal...")
+        reveal_response = invoke_llm_with_fallback(reveal_messages, "SCAFFOLD_REVEAL")
+
+        try:
+            json_str = extract_json_block(reveal_response.content)
+            reveal_resp = reveal_parser.parse(json_str)
+        except Exception as e:
+            print(f"❌ Reveal parse error: {e}")
+            reveal_resp = ScaffoldRevealResponse(
+                acknowledgment="You gave it a really good try — I can see you were thinking hard!",
+                reveal=f"Here's how this step works: {step_description}",
+                encouragement="That's totally fine — these things click with practice. Let's keep going!",
+            )
+
         answer_message = (
-            f"That's okay, no worries! Here's how this step works: {step_description} "
-            f"Let's keep going — you're doing well!"
+            f"{reveal_resp.acknowledgment} "
+            f"{reveal_resp.reveal} "
+            f"{reveal_resp.encouragement}"
         )
         translated_message = translate_if_kannada(state, answer_message)
         messages.append(AIMessage(content=translated_message))
-        
+
         return {
             "step_index": step_index + 1,
-            "scaffold_retry_count": 0,  # Reset for next step
+            "scaffold_retry_count": 0,
             "agent_output": translated_message,
             "messages": messages,
             "current_state": "ADAPTIVE_SOLVER",
         }
-    
-    # Build scaffold prompt with conversation history
+
+    # ── Build scaffold prompt (handles first instruction OR evaluation) ────────
     parser = PydanticOutputParser(pydantic_object=ScaffoldResponse)
     format_instructions = parser.get_format_instructions()
-    
+
+    if is_first_instruction:
+        is_first_str = "YES — introduce this step clearly for the first time and ask a check question. Do NOT evaluate any previous answer."
+        retry_context = ""
+    else:
+        is_first_str = f"NO — the student has responded (attempt {retry_count} of {MAX_SCAFFOLD_RETRIES}). Look at their latest message in conversation history and evaluate it."
+        retry_context = f"Attempts on this step so far: {retry_count} of {MAX_SCAFFOLD_RETRIES} max before I must reveal the answer."
+
     scaffold_user_msg = SCAFFOLD_USER_TEMPLATE.format(
         problem=problem,
         step_index=step_index + 1,
+        total_steps=len(steps),
         current_step=step_description,
         step_concept=step_concept,
-        retry_count=retry_count,
-        max_retries=MAX_SCAFFOLD_RETRIES
+        is_first_instruction=is_first_str,
+        retry_context=retry_context,
     )
-    
-    # Build messages with conversation history
+
     scaffold_messages = build_messages_with_history(
         state=state,
         system_prompt=SCAFFOLD_SYSTEM_PROMPT,
         user_prompt=scaffold_user_msg,
-        format_instructions=format_instructions
+        format_instructions=format_instructions,
     )
-    
-    # Invoke LLM
+
     print("🤖 Calling LLM for scaffold response...")
     response = invoke_llm_with_fallback(scaffold_messages, "SCAFFOLD")
-    
-    # Parse response
+
     try:
         json_str = extract_json_block(response.content)
         scaffold_resp = parser.parse(json_str)
     except Exception as e:
-        print(f"❌ Error parsing scaffold response: {e}")
-        # Fallback response
+        print(f"❌ Parse error: {e}")
         scaffold_resp = ScaffoldResponse(
-            step_instruction=step_description,
-            step_context="Let's work on this step.",
-            check_question="Can you do this step?"
+            response_to_student=f"Let's work on this together. {step_description} Can you try that now?",
+            is_correct=None,
+            should_advance=False,
         )
-    
-    # Build response as a conversational, flowing message — no markdown headers.
-    # The tutor should sound warm and human, not like a formatted document.
-    if scaffold_resp.check_question:
-        response_message = (
-            f"{scaffold_resp.step_context} "
-            f"{scaffold_resp.step_instruction} "
-            f"{scaffold_resp.check_question}"
-        )
-    else:
-        response_message = (
-            f"{scaffold_resp.step_context} "
-            f"{scaffold_resp.step_instruction}"
-        )
-    translated_message = translate_if_kannada(state, response_message)
+
+    translated_message = translate_if_kannada(state, scaffold_resp.response_to_student)
     messages.append(AIMessage(content=translated_message))
-    
-    # Update retry count if this is a retry (user has already responded)
+
+    print(f"   is_correct={scaffold_resp.is_correct} | should_advance={scaffold_resp.should_advance}")
+
+    # ── Update state based on LLM decision ───────────────────────────────────
     update_dict = {
         "agent_output": translated_message,
         "messages": messages,
         "current_state": "ADAPTIVE_SOLVER",
         "current_step_description": step_description,
     }
-    
-    if user_input:
-        # This is a retry on the same step
+
+    if is_first_instruction:
+        # Presented instruction — now waiting for student's attempt
+        update_dict["scaffold_retry_count"] = 1
+    elif scaffold_resp.should_advance:
+        # Student got it right — advance to next step
+        print(f"✅ Step {step_index + 1} complete — advancing to step {step_index + 2}")
+        update_dict["step_index"] = step_index + 1
+        update_dict["scaffold_retry_count"] = 0
+    else:
+        # Wrong answer — retry
         update_dict["scaffold_retry_count"] = retry_count + 1
-    
+        print(f"🔄 Wrong answer — retry_count now {retry_count + 1}")
+
     return update_dict
+
 
 
 # ============================================================================
@@ -1239,6 +1283,7 @@ def reflection_node(state: MathAgentState) -> Dict[str, Any]:
     problem_id = state.get("problem_id")
     problem_data = load_problem_from_json(problem_id)
     final_answer = problem_data.get("final_answer", "the correct answer")
+    steps = problem_data.get("canonical_solution", {}).get("steps", [])
     
     # Determine concepts learned
     concepts_learned = state.get("concepts_taught", [])
@@ -1277,21 +1322,15 @@ def reflection_node(state: MathAgentState) -> Dict[str, Any]:
         reflection_resp = ReflectionResponse(
             appreciation="Great job solving this problem!",
             confidence_check="How confident do you feel about this topic now?",
-            next_action_suggestions=[
-                "Try a similar problem",
-                "Take a break - you've earned it!"
-            ]
+            summary_offer="Would you like me to walk you through a step-by-step summary of the solution?"
         )
     
     # Build response message
     response_parts = [
         reflection_resp.appreciation,
         f"\n{reflection_resp.confidence_check}",
-        "\n**What would you like to do next?**"
+        f"\n{reflection_resp.summary_offer}"
     ]
-    
-    for i, suggestion in enumerate(reflection_resp.next_action_suggestions, 1):
-        response_parts.append(f"{i}. {suggestion}")
     
     response_message = "\n".join(response_parts)
     translated_message = translate_if_kannada(state, response_message)
@@ -1302,7 +1341,91 @@ def reflection_node(state: MathAgentState) -> Dict[str, Any]:
     return {
         "agent_output": translated_message,
         "messages": messages,
-        "current_state": "END",
+        "current_state": "HANDLE_SUMMARY_REQUEST", # Route to summary request handler
+    }
+
+
+# ============================================================================
+# HANDLE SUMMARY REQUEST NODE 
+# ============================================================================
+
+def handle_summary_request_node(state: MathAgentState) -> Dict[str, Any]:
+    """
+    HANDLE SUMMARY REQUEST node.
+    
+    - Evaluates student's response to the summary offer.
+    - If yes, provides steps and asks what next.
+    - If no, just asks what next.
+    """
+    print("\n" + "="*60)
+    print("📝 HANDLE SUMMARY REQUEST NODE")
+    print("="*60)
+
+    messages = state.get("messages", [])
+    problem_id = state.get("problem_id")
+    
+    # Get user's latest response
+    user_input = ""
+    for msg in reversed(messages):
+        if isinstance(msg, HumanMessage):
+            user_input = msg.content
+            break
+
+    # Build prompt
+    parser = PydanticOutputParser(pydantic_object=HandleSummaryResponse)
+    format_instructions = parser.get_format_instructions()
+    
+    handle_summary_user_msg = HANDLE_SUMMARY_REQUEST_USER_TEMPLATE.format(
+        student_reply=user_input
+    )
+    
+    handle_messages = build_messages_with_history(
+        state=state,
+        system_prompt=HANDLE_SUMMARY_REQUEST_SYSTEM_PROMPT,
+        user_prompt=handle_summary_user_msg,
+        format_instructions=format_instructions
+    )
+    
+    print("🤖 Calling LLM for summary request handling...")
+    response = invoke_llm_with_fallback(handle_messages, "HANDLE_SUMMARY_REQUEST")
+    
+    try:
+        json_str = extract_json_block(response.content)
+        handle_resp = parser.parse(json_str)
+    except Exception as e:
+        print(f"❌ Error parsing handle summary response: {e}")
+        # Fallback
+        handle_resp = HandleSummaryResponse(
+            wants_summary=True,
+            response_prefix="Here is the step-by-step summary!",
+            next_action_suggestions=["Try a similar problem", "Take a break!"]
+        )
+
+    response_parts = [handle_resp.response_prefix]
+
+    # If they want the summary, fetch and append the steps
+    if handle_resp.wants_summary:
+        problem_data = load_problem_from_json(problem_id)
+        steps = problem_data.get("canonical_solution", {}).get("steps", [])
+        if steps:
+            response_parts.append("\n**Step-by-step summary:**\n")
+            for i, step in enumerate(steps, 1):
+                response_parts.append(f"**Step {i}:** {step.get('description', '')}")
+            response_parts.append("\n---")
+    
+    # Add next action suggestions
+    response_parts.append("\n**What would you like to do next?**")
+    for i, suggestion in enumerate(handle_resp.next_action_suggestions, 1):
+        response_parts.append(f"{i}. {suggestion}")
+
+    response_message = "\n".join(response_parts)
+    translated_message = translate_if_kannada(state, response_message)
+    messages.append(AIMessage(content=translated_message))
+
+    return {
+        "agent_output": translated_message,
+        "messages": messages,
+        "current_state": "END"
     }
 
 def end_node(state: MathAgentState) -> Dict[str, Any]:

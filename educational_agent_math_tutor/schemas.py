@@ -191,20 +191,72 @@ class GuidedResponse(BaseModel):
 
 class ScaffoldResponse(BaseModel):
     """
-    Response from SCAFFOLD mode - provide one concrete operation for current step.
+    Response from SCAFFOLD mode.
+    
+    Handles BOTH modes in a single LLM call:
+    - First instruction (retry_count == 0): Introduce step + check question
+    - Evaluation (retry_count >= 1): Evaluate student's answer + respond
     """
-    
-    step_instruction: str = Field(
-        description="Clear, concrete instruction for exactly one operation the student should perform"
+
+    response_to_student: str = Field(
+        description=(
+            "Complete, warm, conversational message sent directly to the student. "
+            "If presenting first instruction: introduce the step clearly and end with a check question. "
+            "If evaluating: acknowledge their attempt, then either celebrate (if correct) or "
+            "gently re-explain (if wrong). No markdown, no bullet points. 2-3 sentences max. "
+            "Sound like a warm tutor sitting next to them, not a textbook."
+        )
     )
-    
-    step_context: str = Field(
-        description="Brief context of why this step is needed (age-appropriate)"
-    )
-    
-    check_question: Optional[str] = Field(
+
+    is_correct: Optional[bool] = Field(
         default=None,
-        description="Simple question to verify the student completed this step correctly"
+        description=(
+            "Whether the student's answer to the check question was correct. "
+            "Set to null/None when presenting the first instruction (no evaluation happening). "
+            "Set to true/false when evaluating the student's response."
+        )
+    )
+
+    should_advance: bool = Field(
+        default=False,
+        description=(
+            "True if the student answered correctly and we should move to the next step. "
+            "Must only be True when is_correct=True. "
+            "False when presenting first instruction or when student answered incorrectly."
+        )
+    )
+
+
+class ScaffoldRevealResponse(BaseModel):
+    """
+    Response when max scaffold retries are reached for a step.
+    The LLM looks at the student's actual attempts in the conversation history,
+    acknowledges them specifically, reveals the correct answer/method warmly,
+    and encourages the student to move on.
+    """
+
+    acknowledgment: str = Field(
+        description=(
+            "A warm, specific acknowledgment of the student's attempts. "
+            "Reference what they actually tried (from conversation history) — don't be generic. "
+            "E.g., 'I can see you tried X — that was a good instinct!'"
+        )
+    )
+
+    reveal: str = Field(
+        description=(
+            "Clear, kind reveal of the correct answer/method for this step. "
+            "Include a brief one-sentence explanation of why it works. "
+            "Use simple, age-appropriate language. Do NOT use markdown."
+        )
+    )
+
+    encouragement: str = Field(
+        description=(
+            "Short encouragement transitioning to the next step. "
+            "E.g., 'These things take practice — let's keep going!' "
+            "Keep it warm and forward-looking."
+        )
     )
 
 
@@ -231,8 +283,25 @@ class ReflectionResponse(BaseModel):
         description="Question asking how confident the student feels about this type of problem"
     )
     
+    summary_offer: str = Field(
+        description="A friendly question asking if they would like to review a step-by-step summary of the solution we just learned"
+    )
+
+
+class HandleSummaryResponse(BaseModel):
+    """
+    Response from HANDLE_SUMMARY_REQUEST node - interprets if student wanted summary and gives next steps.
+    """
+    wants_summary: bool = Field(
+        description="Whether the student said they want to see the summary of steps"
+    )
+    
+    response_prefix: str = Field(
+        description="A short 1-sentence acknowledgment (e.g. 'Here you go!' or 'No problem!')"
+    )
+    
     next_action_suggestions: List[str] = Field(
-        description="List of suggested next actions (e.g., 'Try a similar problem', 'Practice with different numbers', 'Learn a new concept')"
+        description="List of suggested next actions (e.g., 'Try a similar problem', 'Practice with different numbers')"
     )
 
 
@@ -327,8 +396,8 @@ class StartAnswerCheckResponse(BaseModel):
         description=(
             "Short message (2-3 sentences max) sent directly to the student. "
             "If correct: warm congratulations then ask 'Would you like me to walk through the steps, or shall we move on?'. "
-            "If wrong attempt 1: begin with 'That is incorrect.' if a numerical answer is given, then give ONE brief conceptual hint — do NOT reveal the answer but also encourage the student to try again and give the correct answer. "
-            "If wrong attempt 2: begin with 'That is incorrect.' if a numerical answer is given, then say you will work through it together.Do NOT reveal the answer.Do not give any further hints either.Just say that we will solve it together or something"
+            "If wrong attempt 1: begin with 'That is incorrect.' if a numerical answer is given. Give ONE brief conceptual hint to help them find the final answer. CRITICAL: Do NOT ask any intermediate questions or ask them to calculate partial steps. Simply provide the hint and encourage them to try finding the FULL and FINAL answer again. Do NOT reveal the answer. "
+            "If wrong attempt 2: begin with 'That is incorrect.' if a numerical answer is given. Say you will work through it together. Do NOT reveal the answer, and do not give any hints. Just say we will solve it together. "
             "NEVER include the correct answer value anywhere in this field."
         )
     )

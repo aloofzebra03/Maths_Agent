@@ -21,6 +21,7 @@ from educational_agent_math_tutor.nodes import (
     assess_approach_node,
     adaptive_solver,
     reflection_node,
+    handle_summary_request_node,
     end_node,
 )
 from educational_agent_math_tutor.input_processor import detect_and_process_input
@@ -199,19 +200,24 @@ def route_after_concept(state: MathAgentState) -> Literal["concept", "re_ask"]:
         return "re_ask"
 
 
-def should_continue_solving(state: MathAgentState) -> Literal["reflection", "assess_approach"]:
+def should_continue_solving(state: MathAgentState) -> Literal["reflection", "assess_approach", "adaptive_solver"]:
     """
-    Route from ADAPTIVE_SOLVER based on whether problem is solved.
-    
+    Route from ADAPTIVE_SOLVER based on whether problem is solved and current mode.
+
     Returns:
-        "reflection" if solved=True, else "assess_approach" (to check progress)
+        "reflection"      if solved=True
+        "adaptive_solver" if mode=="scaffold" (scaffold self-manages step checking)
+        "assess_approach" for coach/guided (re-scoring enables mode promotions)
     """
     if state.get("solved", False):
         print("✅ Problem solved! Routing to REFLECTION")
         return "reflection"
-    else:
-        print("🔄 Problem not yet solved, routing to ASSESS_APPROACH to check progress")
-        return "assess_approach"
+    mode = state.get("mode", "guided")
+    if mode == "scaffold":
+        print("🪜 Scaffold mode — bypassing ASSESS_APPROACH, routing directly to ADAPTIVE_SOLVER")
+        return "adaptive_solver"
+    print(f"🔄 Mode={mode} — routing to ASSESS_APPROACH for re-scoring")
+    return "assess_approach"
 
 
 # ============================================================================
@@ -259,6 +265,7 @@ def create_graph():
     workflow.add_node("ASSESS_APPROACH", create_node_wrapper(assess_approach_node, "ASSESS_APPROACH"))
     workflow.add_node("ADAPTIVE_SOLVER", create_node_wrapper(adaptive_solver, "ADAPTIVE_SOLVER"))
     workflow.add_node("REFLECTION", create_node_wrapper(reflection_node, "REFLECTION"))
+    workflow.add_node("HANDLE_SUMMARY_REQUEST", create_node_wrapper(handle_summary_request_node, "HANDLE_SUMMARY_REQUEST"))
     workflow.add_node("END", create_node_wrapper(end_node, "END"))
     
     # Define edges
@@ -333,12 +340,14 @@ def create_graph():
         should_continue_solving,
         {
             "reflection": "REFLECTION",
-            "assess_approach": "ASSESS_APPROACH"
+            "assess_approach": "ASSESS_APPROACH",
+            "adaptive_solver": "ADAPTIVE_SOLVER",  # Scaffold self-loop: skip ASSESS_APPROACH
         }
     )
     
-    # REFLECTION → END (always)
-    workflow.add_edge("REFLECTION", "END")
+    # REFLECTION → HANDLE_SUMMARY_REQUEST (always)
+    workflow.add_edge("REFLECTION", "HANDLE_SUMMARY_REQUEST")
+    workflow.add_edge("HANDLE_SUMMARY_REQUEST", "END")
     workflow.add_edge("END", END)
     
     # Compile with MemorySaver checkpointer
@@ -346,7 +355,7 @@ def create_graph():
 
     graph = workflow.compile(
         # checkpointer=checkpointer,
-        interrupt_after=["START", "CHECK_ANSWER", "HANDLE_STEP_EXPLANATION", "ASSESSMENT", "ADAPTIVE_SOLVER", "RE_ASK", "CONCEPT", "REFLECTION"]
+        interrupt_after=["START", "CHECK_ANSWER", "HANDLE_STEP_EXPLANATION", "ASSESSMENT", "ADAPTIVE_SOLVER", "RE_ASK", "CONCEPT", "REFLECTION", "HANDLE_SUMMARY_REQUEST"]
     )
 
     print("✅ Graph compiled successfully")
