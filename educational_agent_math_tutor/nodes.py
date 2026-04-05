@@ -1187,7 +1187,7 @@ def _scaffold_logic(state: MathAgentState) -> Dict[str, Any]:
     format_instructions = parser.get_format_instructions()
 
     if is_first_instruction:
-        is_first_str = "YES — introduce this step clearly for the first time and ask a check question. Do NOT evaluate any previous answer."
+        is_first_str = "YES — introduce this step clearly for the first time and ask a check question.If the student has already solved this step correctly then you can directly move on after acknowledging it."
         retry_context = ""
     else:
         is_first_str = f"NO — the student has responded (attempt {retry_count} of {MAX_SCAFFOLD_RETRIES}). Look at their latest message in conversation history and evaluate it."
