@@ -354,7 +354,7 @@ def create_graph():
     checkpointer = InMemorySaver()
 
     graph = workflow.compile(
-        # checkpointer=checkpointer,
+        checkpointer=checkpointer,
         interrupt_after=["START", "CHECK_ANSWER", "HANDLE_STEP_EXPLANATION", "ASSESSMENT", "ADAPTIVE_SOLVER", "RE_ASK", "CONCEPT", "REFLECTION", "HANDLE_SUMMARY_REQUEST"]
     )
 
