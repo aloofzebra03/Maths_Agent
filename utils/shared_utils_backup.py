@@ -3,13 +3,6 @@ Shared utilities for the Math Tutoring Agent.
 
 Contains helper functions for LLM invocation, JSON extraction,
 and problem loading from JSON files.
-
-Conversation-history strategy (reference pattern):
-  Conversation history is serialised to labelled plain text
-  (Student: / Agent:), then concatenated with the system prompt,
-  task prompt, and format instructions into ONE string that is
-  sent as a single HumanMessage.  This is the same technique used
-  in educational_agent_optimized_langsmith / shared_utils_reference.py.
 """
 
 import os
@@ -20,7 +13,6 @@ import uuid
 from typing import List, Optional, Dict, Any
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
-from langchain_core.prompts import PromptTemplate
 import dotenv
 
 dotenv.load_dotenv(dotenv_path=".env", override=True)
@@ -124,6 +116,57 @@ def get_llm(api_key: Optional[str] = None, model: str = "gemma-3-27b-it") -> Cha
     )
 
 
+def _normalize_messages_for_model(messages: List, model: str) -> List:
+    """
+    Normalize a message list so it is compatible with the selected model.
+
+    Gemma models (gemma-3-*) do NOT support SystemMessage — the API returns:
+        "400 Developer instruction is not enabled for models/gemma-3-*"
+
+    For these models we convert every SystemMessage by prepending its content
+    to the first HumanMessage with a clear header so the LLM still reads the
+    instruction as authoritative context.
+
+    Gemini models support SystemMessage natively — no conversion needed.
+
+    Args:
+        messages: Message list built by build_messages_with_history()
+        model: The model name selected by the tracker
+
+    Returns:
+        Normalized message list safe for the given model
+    """
+    if "gemma" not in model.lower():
+        return messages  # Gemini and others — no change needed
+
+    # Collect all SystemMessage content, then rebuild without SystemMessages
+    system_parts = []
+    other_messages = []
+    for msg in messages:
+        if isinstance(msg, SystemMessage):
+            system_parts.append(msg.content)
+        else:
+            other_messages.append(msg)
+
+    if not system_parts:
+        return other_messages  # Nothing to convert
+
+    # Build a combined system prefix
+    system_prefix = "\n\n---\n\n".join(system_parts)
+    system_header = f"[Instructions for you — follow these throughout the conversation]\n{system_prefix}\n\n---\n"
+
+    # Prepend to first HumanMessage, or insert a new HumanMessage at position 0
+    if other_messages and isinstance(other_messages[0], HumanMessage):
+        other_messages[0] = HumanMessage(
+            content=f"{system_header}\n{other_messages[0].content}"
+        )
+    else:
+        other_messages.insert(0, HumanMessage(content=system_header))
+
+    print(f"⚙️ Converted {len(system_parts)} SystemMessage(s) for Gemma compatibility")
+    return other_messages
+
+
 def invoke_llm_with_fallback(messages: List, operation_name: str = "LLM call"):
     """
     Invoke LLM using tracker-selected API key and model pair (if available).
@@ -131,11 +174,16 @@ def invoke_llm_with_fallback(messages: List, operation_name: str = "LLM call"):
     If tracker is available, automatically selects optimal API key and model
     based on rate limits. Otherwise, uses default API key from environment.
 
+    Before invocation, messages are normalized for the selected model:
+    - Gemini models: SystemMessage supported natively (no change)
+    - Gemma models: SystemMessage converted to HumanMessage prefix
+
     Strategy:
     1. Get optimal API key and model from tracker (or use default)
     2. Track the call BEFORE invocation (for rate limiting)
-    3. Invoke LLM with selected pair
-    4. Let errors bubble up for proper error handling
+    3. Normalize messages for the selected model
+    4. Invoke LLM with selected pair
+    5. Let errors bubble up for proper error handling
 
     Args:
         messages: List of messages to send to the LLM
@@ -150,19 +198,26 @@ def invoke_llm_with_fallback(messages: List, operation_name: str = "LLM call"):
         Exception: Any other LLM invocation errors
     """
     if TRACKER_AVAILABLE:
+        # Use tracker to get optimal API key and model
         selected_api_key, selected_model = get_next_available_api_model_pair()
         print(f"🔑 Using tracked API key (ending with ...{selected_api_key[-6:]}) for model: {selected_model}")
+
+        # Track BEFORE invocation for accurate rate limiting
         track_model_call(selected_api_key, selected_model)
+
         llm = get_llm(api_key=selected_api_key, model=selected_model)
     else:
+        # Fallback to environment variable
         selected_model = "gemma-3-27b-it"
         print(f"🔑 Using default API key from environment for model: {selected_model}")
         llm = get_llm(model=selected_model)
 
-    print(f"📨 Sending {len(messages)} message(s) to model: {selected_model}")
+    # Normalize messages for model compatibility (Gemma doesn't support SystemMessage)
+    normalized_messages = _normalize_messages_for_model(messages, selected_model)
+    print(f"Normalized messages: {normalized_messages}")
     try:
         print(f"▶️ Invoking LLM for operation: {operation_name}")
-        response = llm.invoke(messages)
+        response = llm.invoke(normalized_messages)
         print(f"✅ {operation_name} - Success with model: {selected_model}")
         return response
     except Exception as e:
@@ -358,41 +413,8 @@ def format_required_concepts(concepts: List[str]) -> str:
 
 
 # ============================================================================
-# Conversation History Utilities  (reference / text-serialisation pattern)
+# Conversation History Utilities
 # ============================================================================
-
-def build_conversation_history(state: AgentState) -> str:
-    """
-    Serialise state["messages"] to a plain-text labelled transcript.
-
-    Each message type gets a clear speaker label:
-        Student: <human turn>
-        Agent:   <ai turn>
-        System:  <system turn>  (rarely present; kept for completeness)
-
-    The "__start__" sentinel used by some graph initialisers is skipped.
-
-    Args:
-        state: Agent state containing messages list
-
-    Returns:
-        Newline-separated labelled transcript, or "" if history is empty
-    """
-    conversation = state.get("messages", [])
-    history_text = ""
-
-    for msg in conversation:
-        if isinstance(msg, HumanMessage):
-            if msg.content == "__start__":
-                continue
-            history_text += f"Student: {msg.content}\n"
-        elif isinstance(msg, AIMessage):
-            history_text += f"Agent: {msg.content}\n"
-        elif isinstance(msg, SystemMessage):
-            history_text += f"System: {msg.content}\n"
-
-    return history_text.strip()
-
 
 def build_messages_with_history(
     state: Dict[str, Any],
@@ -402,37 +424,37 @@ def build_messages_with_history(
     remove_problem_messages: bool = False,
 ) -> List:
     """
-    Build a single-message list for LLM invocation using the reference pattern.
+    Build message list with conversation history for LLM invocation.
 
-    Everything — system prompt, conversation history, task prompt, and format
-    instructions — is assembled into ONE plain-text string and wrapped in a
-    single HumanMessage.  This mirrors the technique used in
-    educational_agent_optimized_langsmith / shared_utils_reference.py.
+    Final message order:
+        [SystemMessage(system_prompt)] + [filtered history] + [HumanMessage(user_prompt + format_instructions?)]
 
-    Assembled string order:
-        {system_prompt + language instruction}
+    The SystemMessage is ALWAYS first (authoritative context frame): for Gemini
+    it is sent natively as a privileged system turn (visible in LangSmith as
+    "system"); for Gemma it is converted to a HumanMessage prefix by
+    _normalize_messages_for_model before the actual LLM call.
 
-        Conversation History:
-        Student: ...
-        Agent:   ...
+    Stale SystemMessages are ALWAYS stripped from history — every call to this
+    function supplies a fresh, node-specific SystemMessage, so any SystemMessage
+    left over in state["messages"] from a prior node would create conflicting
+    instructions. Filtering them unconditionally keeps the conversation clean.
 
-        {user_prompt}
-
-        {format_instructions}    ← appended last, maximum recency weight
+    user_prompt and format_instructions are merged into ONE final HumanMessage
+    because Gemini enforces strict alternating human→model turns; two
+    consecutive HumanMessages (with no AI turn between them) are rejected by
+    the API. Format instructions are placed LAST inside the turn for maximum
+    recency weight.
 
     Args:
         state: Agent state containing messages
         system_prompt: Core system instruction (tutor persona, node task, etc.)
-        user_prompt: Task context / question for this turn
-        format_instructions: Pydantic format instructions (appended at end)
-        remove_problem_messages: Kept for backward-compatibility; has no effect
-            in the text-serialisation pattern because SystemMessages from
-            history are rendered as "System:" lines and are already
-            distinguishable from the leading system_prompt block.
+        user_prompt: Task instruction/query for this turn
+        format_instructions: Pydantic format instructions (appended at end of single HumanMessage)
+        remove_problem_messages: Kept for backward-compatibility; SystemMessages
+            are always stripped from history regardless of this flag.
 
     Returns:
-        [HumanMessage(combined_prompt_string)]  — single-element list compatible
-        with invoke_llm_with_fallback()
+        List of messages ready for LLM invocation
     """
     # Append language instruction to system prompt
     if state.get("is_kannada", False):
@@ -440,46 +462,31 @@ def build_messages_with_history(
     else:
         system_prompt += "\n\nIMPORTANT: You must respond ONLY in English. All your responses must be in English, not Kannada or any other language."
 
-    # Build conversation history as labelled text
-    history = build_conversation_history(state)
+    # 1. System message — always first.
+    #    For Gemini: sent natively as a system turn (visible in LangSmith as "system").
+    #    For Gemma: converted by _normalize_messages_for_model before invocation.
+    messages: List = [SystemMessage(content=system_prompt)]
 
-    # Assemble prompt parts using a PromptTemplate (mirrors reference exactly)
-    template_parts = ["{system_prompt}"]
-    template_vars = ["system_prompt"]
+    # 2. Conversation history — always strip stale SystemMessages.
+    #    Each call supplies its own fresh system prompt above; retaining old ones
+    #    would create conflicting instructions and confuse the model.
+    conversation_history = state.get("messages", [])
+    filtered_history = [m for m in conversation_history if not isinstance(m, SystemMessage)]
+    messages.extend(filtered_history)
 
-    if history:
-        template_parts.append("\n\nConversation History:\n{history}")
-        template_vars.append("history")
-
-    template_parts.append("\n\n{user_prompt}")
-    template_vars.append("user_prompt")
-
+    # 3. Single final HumanMessage: task prompt + format instructions (if any).
+    #    Merging avoids consecutive HumanMessages which Gemini's API rejects
+    #    (it enforces strict alternating human→model turns).
+    #    Format instructions go LAST for maximum recency weight.
+    final_user_content = user_prompt
     if format_instructions:
-        template_parts.append("\n\n{format_instructions}")
-        template_vars.append("format_instructions")
+        final_user_content = f"{user_prompt}\n\n{format_instructions}"
+    messages.append(HumanMessage(content=final_user_content))
 
-    template_string = "".join(template_parts)
-    prompt_template = PromptTemplate(
-        input_variables=template_vars,
-        template=template_string,
-    )
-
-    template_values: Dict[str, str] = {
-        "system_prompt": system_prompt,
-        "user_prompt": user_prompt,
-    }
-    if history:
-        template_values["history"] = history
-    if format_instructions:
-        template_values["format_instructions"] = format_instructions
-
-    final_prompt = prompt_template.format(**template_values)
-
-    n_history = len(state.get("messages", []))
+    n_history = len(filtered_history)
     print(
-        f"📊 Built prompt: system + {n_history} history msg(s) + task prompt"
-        + (" + format spec" if format_instructions else "")
+        f"📊 Built message list: 1 system + {n_history} history + 1 user turn"
+        + (" (includes format spec)" if format_instructions else "")
     )
-    print(f"📝 Prompt length: {len(final_prompt)} characters")
 
-    return [HumanMessage(content=final_prompt)]
+    return messages
