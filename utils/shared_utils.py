@@ -427,22 +427,31 @@ def build_messages_with_history(
     Build message list with conversation history for LLM invocation.
 
     Final message order:
-        [SystemMessage] + [filtered history] + [HumanMessage(user_prompt + format_instructions)]
+        [SystemMessage(system_prompt)] + [filtered history] + [HumanMessage(user_prompt + format_instructions?)]
 
-    The SystemMessage is ALWAYS first (authoritative context frame).
+    The SystemMessage is ALWAYS first (authoritative context frame): for Gemini
+    it is sent natively as a privileged system turn (visible in LangSmith as
+    "system"); for Gemma it is converted to a HumanMessage prefix by
+    _normalize_messages_for_model before the actual LLM call.
 
-    Format instructions are appended at the END of the single final HumanMessage
-    so they are the very last text the LLM reads before generating its response.
-    This avoids consecutive HumanMessages (which confuse alternating-turn models)
-    and gives the format spec maximum recency weight.
+    Stale SystemMessages are ALWAYS stripped from history — every call to this
+    function supplies a fresh, node-specific SystemMessage, so any SystemMessage
+    left over in state["messages"] from a prior node would create conflicting
+    instructions. Filtering them unconditionally keeps the conversation clean.
+
+    user_prompt and format_instructions are merged into ONE final HumanMessage
+    because Gemini enforces strict alternating human→model turns; two
+    consecutive HumanMessages (with no AI turn between them) are rejected by
+    the API. Format instructions are placed LAST inside the turn for maximum
+    recency weight.
 
     Args:
         state: Agent state containing messages
         system_prompt: Core system instruction (tutor persona, node task, etc.)
         user_prompt: Task instruction/query for this turn
-        format_instructions: Pydantic format instructions (appended last inside user HumanMessage)
-        remove_problem_messages: If True, strip any SystemMessages from stored
-            history. Human/AI dialogue is always preserved.
+        format_instructions: Pydantic format instructions (appended at end of single HumanMessage)
+        remove_problem_messages: Kept for backward-compatibility; SystemMessages
+            are always stripped from history regardless of this flag.
 
     Returns:
         List of messages ready for LLM invocation
@@ -453,30 +462,31 @@ def build_messages_with_history(
     else:
         system_prompt += "\n\nIMPORTANT: You must respond ONLY in English. All your responses must be in English, not Kannada or any other language."
 
-    # System message MUST lead — LLM reads this as the authoritative context frame
-    temp_messages = [SystemMessage(content=system_prompt)]
+    # 1. System message — always first.
+    #    For Gemini: sent natively as a system turn (visible in LangSmith as "system").
+    #    For Gemma: converted by _normalize_messages_for_model before invocation.
+    messages: List = [SystemMessage(content=system_prompt)]
 
-    # Add conversation history from state
+    # 2. Conversation history — always strip stale SystemMessages.
+    #    Each call supplies its own fresh system prompt above; retaining old ones
+    #    would create conflicting instructions and confuse the model.
     conversation_history = state.get("messages", [])
+    filtered_history = [m for m in conversation_history if not isinstance(m, SystemMessage)]
+    messages.extend(filtered_history)
 
-    if remove_problem_messages:
-        # Strip stale SystemMessages from stored history (they came from previous nodes).
-        # Preserve all Human/AI turns so the LLM keeps the full dialogue context.
-        filtered = [m for m in conversation_history if not isinstance(m, SystemMessage)]
-        temp_messages.extend(filtered)
-    else:
-        temp_messages.extend(conversation_history)
-
-    # Build the single final HumanMessage.
-    # Format instructions are appended INSIDE it — guaranteed to be the very last
-    # text the LLM reads, with no risk of consecutive HumanMessages.
+    # 3. Single final HumanMessage: task prompt + format instructions (if any).
+    #    Merging avoids consecutive HumanMessages which Gemini's API rejects
+    #    (it enforces strict alternating human→model turns).
+    #    Format instructions go LAST for maximum recency weight.
     final_user_content = user_prompt
     if format_instructions:
         final_user_content = f"{user_prompt}\n\n{format_instructions}"
+    messages.append(HumanMessage(content=final_user_content))
 
-    temp_messages.append(HumanMessage(content=final_user_content))
+    n_history = len(filtered_history)
+    print(
+        f"📊 Built message list: 1 system + {n_history} history + 1 user turn"
+        + (" (includes format spec)" if format_instructions else "")
+    )
 
-    print(f"📊 Built message list: 1 system + {len(conversation_history)} history + 1 instruction"
-          f"{' (with format spec)' if format_instructions else ''}")
-
-    return temp_messages
+    return messages
