@@ -423,13 +423,14 @@ Return JSON following the ConceptEvaluationResponse schema.
 CONCEPT_EVALUATE_USER_TEMPLATE_EARLY = """**Concept Being Taught:**
 {concept}
 
-**Student's Answer to Micro-Check:**
+**Micro-Check Question You Asked:**
+{micro_check_question}
+
+**Student's Answer:**
 {student_response}
 
-**Previous Teaching Attempts:**
-Understand from the conversation history how the concept was taught before.
-
-Evaluate their understanding and either move on or re-teach with a different approach.
+First check whether the student's answer is mathematically/factually correct for the question above.
+Then evaluate their understanding and either move on or re-teach with a different approach.
 """
 
 CONCEPT_EVALUATE_SYSTEM_PROMPT_FINAL = """You are a patient math tutor wrapping up concept teaching after 3 attempts with a Class 7 student.
@@ -457,12 +458,16 @@ Return JSON following the ConceptEvaluationResponse schema with understood=False
 CONCEPT_EVALUATE_USER_TEMPLATE_FINAL = """**Concept Being Taught:**
 {concept}
 
+**Micro-Check Question You Asked:**
+{micro_check_question}
+
+**Student's Answer:**
+{student_response}
+
 **Problem Context:**
 {problem}
 
-**Student's Answer to Micro-Check:**
-{student_response}
-
+First check whether the student's answer is mathematically/factually correct for the question above.
 This is the final attempt. Acknowledge their effort, provide the correct understanding, and prepare to move on.
 """
 

@@ -553,51 +553,58 @@ def concept_node(state: MathAgentState) -> Dict[str, Any]:
     # ============================================
     # SUBSEQUENT TIMES: Evaluate + Respond (SINGLE LLM CALL)
     # ============================================
-    
+
     # Get user's latest response
     user_input = None
     for msg in reversed(messages):
         if isinstance(msg, HumanMessage):
             user_input = msg.content
             break
-    
+
     if not user_input:
         print("⚠️ No user input found, waiting for student response")
         return {
             "current_state": "CONCEPT",
         }
-    
+
+    # Extract the micro-check question: the last AIMessage the tutor sent.
+    # Passing this explicitly prevents the evaluator LLM from having to search
+    # through the full conversation history to find what question was asked —
+    # which was causing it to miss the question and incorrectly mark answers
+    # as correct (e.g. student answered -1 to "3 × -5 = ?" but LLM said ✅).
+    micro_check_question = ""
+    for msg in reversed(messages):
+        if isinstance(msg, AIMessage):
+            micro_check_question = msg.content
+            break
+    print(f"🔍 Micro-check question extracted: {micro_check_question[:80]}...")
+
     # Increment tries
     tries = state.get("concept_tries", 0) + 1
     print(f"📊 Evaluating student response (try {tries}/3)")
-    
-    # # Get conversation history for context
-    # previous_teaching = "\n".join([
-    #     f"{'AI' if isinstance(m, AIMessage) else 'Student'}: {m.content[:100]}..."
-    #     for m in messages[-6:] if isinstance(m, (AIMessage, HumanMessage))
-    # ])
-    
+
     # Build evaluation prompt based on try count
     parser = PydanticOutputParser(pydantic_object=ConceptEvaluationResponse)
     format_instructions = parser.get_format_instructions()
-    
+
     if tries < 3:
         # Early tries: can re-teach if needed
         system_prompt = CONCEPT_EVALUATE_SYSTEM_PROMPT_EARLY.format(tries=tries)
         user_msg = CONCEPT_EVALUATE_USER_TEMPLATE_EARLY.format(
             concept=current_concept,
+            micro_check_question=micro_check_question,
             student_response=user_input,
-            # previous_teaching=previous_teaching
         )
     else:
         # Final try: must move on
         system_prompt = CONCEPT_EVALUATE_SYSTEM_PROMPT_FINAL
         user_msg = CONCEPT_EVALUATE_USER_TEMPLATE_FINAL.format(
             concept=current_concept,
+            micro_check_question=micro_check_question,
             problem=problem,
-            student_response=user_input
+            student_response=user_input,
         )
-    
+
     # Build messages with conversation history
     eval_messages = build_messages_with_history(
         state=state,
