@@ -77,6 +77,42 @@ from utils.shared_utils import (
 )
 
 
+def _repair_scaffold_json_response(
+    state: MathAgentState,
+    raw_response: str,
+    format_instructions: str,
+) -> ScaffoldResponse:
+    """
+    Attempt one strict JSON repair pass for SCAFFOLD output.
+
+    The original scaffold call may return plain conversational text. This helper
+    asks the LLM to convert that content into the exact ScaffoldResponse JSON.
+    If repair parsing fails, the caller should raise.
+    """
+    parser = PydanticOutputParser(pydantic_object=ScaffoldResponse)
+    repair_system_prompt = (
+        "You convert tutor text into strict JSON. "
+        "Output ONLY one valid JSON object. No markdown fences. No extra text."
+    )
+    repair_user_prompt = (
+        "Convert the following tutor output to ScaffoldResponse JSON. "
+        "Preserve pedagogical intent and tone in response_to_student. "
+        "If output is evaluation, set is_correct and should_advance consistently.\n\n"
+        f"Tutor output:\n{raw_response}"
+    )
+
+    repair_messages = build_messages_with_history(
+        state=state,
+        system_prompt=repair_system_prompt,
+        user_prompt=repair_user_prompt,
+        format_instructions=format_instructions,
+        include_last_message=False,
+    )
+    repair_response = invoke_llm_with_fallback(repair_messages, "SCAFFOLD_JSON_REPAIR")
+    repair_json_str = extract_json_block(repair_response.content)
+    return parser.parse(repair_json_str)
+
+
 # ============================================================================
 # START NODE
 # ============================================================================
@@ -224,10 +260,8 @@ def check_answer_node(state: MathAgentState) -> Dict[str, Any]:
         check_resp = parser.parse(json_str)
     except Exception as e:
         print(f"❌ Parse error: {e}")
-        check_resp = StartAnswerCheckResponse(
-            is_correct=False,
-            feedback="That is incorrect. Let's work through this together.",
-        )
+        print(f"Raw response: {response.content}")
+        raise RuntimeError("Failed to parse CHECK_ANSWER response") from e
 
     feedback = translate_if_kannada(state, check_resp.feedback)
     messages.append(AIMessage(content=feedback))
@@ -310,10 +344,8 @@ def handle_step_explanation_node(state: MathAgentState) -> Dict[str, Any]:
         reply_text = parsed.get("response", "")
     except Exception as e:
         print(f"❌ Parse error: {e}")
-        # Fallback: naive keyword check
-        lower = user_input.lower()
-        wants_explanation = any(w in lower for w in ["yes", "sure", "please", "explain", "walk"])
-        reply_text = "Great, let's go through it!" if wants_explanation else "Well done! You nailed it! 🎉"
+        print(f"Raw response: {response.content}")
+        raise RuntimeError("Failed to parse HANDLE_STEP_EXPLANATION response") from e
 
     translated_reply = translate_if_kannada(state, reply_text)
     messages.append(AIMessage(content=translated_reply))
@@ -420,12 +452,7 @@ def assess_student_response(state: MathAgentState) -> Dict[str, Any]:
     except Exception as e:
         print(f"❌ Error parsing concept check response: {e}")
         print(f"Raw response: {response.content}")
-        # Fallback to no missing concepts
-        concept_check = ConceptCheckResponse(
-            missing_concepts=[],
-            reasoning="Unable to parse concept check response",
-            response_to_student="Thanks for sharing your thoughts! Let me take a look and we'll figure out the best way to tackle this problem together."
-        )
+        raise RuntimeError("Failed to parse CONCEPT_CHECK response") from e
     
     print(f"📊 Concept Check Results:")
     print(f"   Missing Concepts: {concept_check.missing_concepts or 'None'}")
@@ -528,10 +555,8 @@ def concept_node(state: MathAgentState) -> Dict[str, Any]:
             concept_resp = parser.parse(json_str)
         except Exception as e:
             print(f"❌ Error parsing concept response: {e}")
-            # Fallback response
-            concept_resp = ConceptResponse(
-                teaching_response=f"Hey! Let me help you understand {current_concept}. Think of it like this... [natural explanation]. Does that make sense to you?"
-            )
+            print(f"Raw response: {response.content}")
+            raise RuntimeError("Failed to parse CONCEPT response") from e
         
         # Use the natural teaching response directly
         response_message = concept_resp.teaching_response
@@ -624,12 +649,8 @@ def concept_node(state: MathAgentState) -> Dict[str, Any]:
         eval_resp = parser.parse(json_str)
     except Exception as e:
         print(f"❌ Error parsing evaluation response: {e}")
-        # Fallback: assume not understood, stay for one more try
-        eval_resp = ConceptEvaluationResponse(
-            understood=False,
-            next_state="stay" if tries < 3 else "move_on",
-            response_to_student="Let me try to explain this differently..."
-        )
+        print(f"Raw response: {response.content}")
+        raise RuntimeError("Failed to parse CONCEPT_EVAL response") from e
     
     print(f"📊 Evaluation: understood={eval_resp.understood}, next_state={eval_resp.next_state}")
     
@@ -828,13 +849,7 @@ def assess_approach_node(state: MathAgentState) -> Dict[str, Any]:
     except Exception as e:
         print(f"❌ Error parsing approach assessment response: {e}")
         print(f"Raw response: {response.content}")
-        raise e
-        # # Fallback to default values
-        # assessment = ApproachAssessmentResponse(
-        #     Tu=0.3,
-        #     Ta=0.3,
-        #     reasoning="Unable to parse assessment response"
-        # )
+        raise RuntimeError("Failed to parse APPROACH_ASSESSMENT response") from e
     
     print(f"📊 Approach Assessment Results:")
     print(f"   Tu (Understanding): {assessment.Tu:.2f}")
@@ -953,13 +968,8 @@ def _coach_logic(state: MathAgentState) -> Dict[str, Any]:
         coach_resp = parser.parse(json_str)
     except Exception as e:
         print(f"❌ Error parsing coach response: {e}")
-        # Fallback response
-        coach_resp = CoachResponse(
-            validation="Let me think about your approach.",
-            is_correct=False,
-            reflective_question="Can you explain your thinking?",
-            encouragement="You're doing great!"
-        )
+        print(f"Raw response: {response.content}")
+        raise RuntimeError("Failed to parse COACH response") from e
     
     # Build response message
     response_parts = [coach_resp.validation]
@@ -1061,13 +1071,8 @@ def _guided_logic(state: MathAgentState) -> Dict[str, Any]:
         guided_resp = parser.parse(json_str)
     except Exception as e:
         print(f"❌ Error parsing guided response: {e}")
-        # Fallback response
-        guided_resp = GuidedResponse(
-            acknowledgment="I see you're thinking about this.",
-            missing_piece="We need to focus on the method.",
-            hint="Think about what operation you need to do.",
-            encouragement="You're on the right track!"
-        )
+        print(f"Raw response: {response.content}")
+        raise RuntimeError("Failed to parse GUIDED response") from e
     
     # Build response message as a flowing, conversational paragraph
     # Rather than four separate blocks separated by newlines, weave them together
@@ -1167,11 +1172,8 @@ def _scaffold_logic(state: MathAgentState) -> Dict[str, Any]:
             reveal_resp = reveal_parser.parse(json_str)
         except Exception as e:
             print(f"❌ Reveal parse error: {e}")
-            reveal_resp = ScaffoldRevealResponse(
-                acknowledgment="You gave it a really good try — I can see you were thinking hard!",
-                reveal=f"Here's how this step works: {step_description}",
-                encouragement="That's totally fine — these things click with practice. Let's keep going!",
-            )
+            print(f"Raw response: {reveal_response.content}")
+            raise RuntimeError("Failed to parse SCAFFOLD_REVEAL response") from e
 
         answer_message = (
             f"{reveal_resp.acknowledgment} "
@@ -1225,11 +1227,18 @@ def _scaffold_logic(state: MathAgentState) -> Dict[str, Any]:
         scaffold_resp = parser.parse(json_str)
     except Exception as e:
         print(f"❌ Parse error: {e}")
-        scaffold_resp = ScaffoldResponse(
-            response_to_student=f"Let's work on this together. {step_description} Can you try that now?",
-            is_correct=None,
-            should_advance=False,
-        )
+        print(f"Raw response: {response.content}")
+        print("🔧 Attempting one JSON repair pass for SCAFFOLD response...")
+        try:
+            scaffold_resp = _repair_scaffold_json_response(
+                state=state,
+                raw_response=response.content,
+                format_instructions=format_instructions,
+            )
+            print("✅ SCAFFOLD JSON repair succeeded")
+        except Exception as repair_error:
+            print(f"❌ SCAFFOLD JSON repair failed: {repair_error}")
+            raise RuntimeError("Failed to parse SCAFFOLD response") from e
 
     translated_message = translate_if_kannada(state, scaffold_resp.response_to_student)
     messages.append(AIMessage(content=translated_message))
@@ -1325,12 +1334,8 @@ def reflection_node(state: MathAgentState) -> Dict[str, Any]:
         reflection_resp = parser.parse(json_str)
     except Exception as e:
         print(f"❌ Error parsing reflection response: {e}")
-        # Fallback response
-        reflection_resp = ReflectionResponse(
-            appreciation="Great job solving this problem!",
-            confidence_check="How confident do you feel about this topic now?",
-            summary_offer="Would you like me to walk you through a step-by-step summary of the solution?"
-        )
+        print(f"Raw response: {response.content}")
+        raise RuntimeError("Failed to parse REFLECTION response") from e
     
     # Build response message
     response_parts = [
@@ -1401,12 +1406,8 @@ def handle_summary_request_node(state: MathAgentState) -> Dict[str, Any]:
         handle_resp = parser.parse(json_str)
     except Exception as e:
         print(f"❌ Error parsing handle summary response: {e}")
-        # Fallback
-        handle_resp = HandleSummaryResponse(
-            wants_summary=True,
-            response_prefix="Here is the step-by-step summary!",
-            next_action_suggestions=["Try a similar problem", "Take a break!"]
-        )
+        print(f"Raw response: {response.content}")
+        raise RuntimeError("Failed to parse HANDLE_SUMMARY_REQUEST response") from e
 
     response_parts = [handle_resp.response_prefix]
 

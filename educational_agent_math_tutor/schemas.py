@@ -396,8 +396,8 @@ class StartAnswerCheckResponse(BaseModel):
         description=(
             "Short message (2-3 sentences max) sent directly to the student. "
             "If correct: warm congratulations then ask 'Would you like me to walk through the steps, or shall we move on?'. "
-            "If wrong attempt 1: begin with 'That is incorrect.' if a numerical answer is given. Give ONE brief conceptual hint to help them find the final answer. CRITICAL: Do NOT ask any intermediate questions or ask them to calculate partial steps. Simply provide the hint and encourage them to try finding the FULL and FINAL answer again. Do NOT reveal the answer. "
-            "If wrong attempt 2: begin with 'That is incorrect.' if a numerical answer is given. Say you will work through it together. Do NOT reveal the answer, and do not give any hints. Just say we will solve it together. "
+            "If wrong attempt 1: begin with 'That is incorrect.' only if a numerical answer is given. Give ONE brief conceptual hint to help them find the final answer. CRITICAL: Do NOT ask any intermediate questions or ask them to calculate partial steps. Simply provide the hint and encourage them to try finding the FULL and FINAL answer again. Do NOT reveal the answer. "
+            "If wrong attempt 2: begin with 'That is incorrect.' only if a numerical answer is given. Say you will work through it together. Do NOT reveal the answer, and do not give any hints. Just say we will solve it together. "
             "NEVER include the correct answer value anywhere in this field."
         )
     )

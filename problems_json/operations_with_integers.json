@@ -62,7 +62,7 @@
         },
         {
           "step_id": 3,
-          "description": "Determine the marks Anil received for his incorrect answers. Subtract his correct answer marks from his final score: -10 - 20 = -30 marks.",
+          "description": "Determine the marks Anil lost for his incorrect answers. Subtract the marks from correct answers from the total score to find the marks lost: -10 - 20 = -30.",
           "concept": "integer_subtraction"
         },
         {

@@ -101,7 +101,11 @@ def extract_json_block(text: str) -> str:
 # LLM Utilities
 # ============================================================================
 
-def get_llm(api_key: Optional[str] = None, model: str = "gemma-3-27b-it") -> ChatGoogleGenerativeAI:
+def get_llm(
+    api_key: Optional[str] = None,
+    model: str = "gemma-3-27b-it",
+    temperature: float = 0.5,
+) -> ChatGoogleGenerativeAI:
     """
     Get configured LLM instance with specified API key and model.
 
@@ -120,7 +124,7 @@ def get_llm(api_key: Optional[str] = None, model: str = "gemma-3-27b-it") -> Cha
     return ChatGoogleGenerativeAI(
         model=model,
         api_key=api_key,
-        temperature=0.5,
+        temperature=temperature,
     )
 
 
@@ -149,17 +153,19 @@ def invoke_llm_with_fallback(messages: List, operation_name: str = "LLM call"):
         DayLimitExhaustedError: When all API-model pairs hit daily limits (if tracker available)
         Exception: Any other LLM invocation errors
     """
+    temperature = 0.5
+
     if TRACKER_AVAILABLE:
         selected_api_key, selected_model = get_next_available_api_model_pair()
         print(f"🔑 Using tracked API key (ending with ...{selected_api_key[-6:]}) for model: {selected_model}")
         track_model_call(selected_api_key, selected_model)
-        llm = get_llm(api_key=selected_api_key, model=selected_model)
+        llm = get_llm(api_key=selected_api_key, model=selected_model, temperature=temperature)
     else:
         selected_model = "gemma-3-27b-it"
         print(f"🔑 Using default API key from environment for model: {selected_model}")
-        llm = get_llm(model=selected_model)
+        llm = get_llm(model=selected_model, temperature=temperature)
 
-    print(f"📨 Sending {len(messages)} message(s) to model: {selected_model}")
+    print(f"📨 Sending {len(messages)} message(s) to model: {selected_model} (temperature={temperature})")
     try:
         print(f"▶️ Invoking LLM for operation: {operation_name}")
         response = llm.invoke(messages)
@@ -400,21 +406,23 @@ def build_messages_with_history(
     user_prompt: str,
     format_instructions: Optional[str] = None,
     remove_problem_messages: bool = False,
+    include_last_message: bool = False,
 ) -> List:
     """
     Build a single-message list for LLM invocation using the reference pattern.
 
-    Everything — system prompt, conversation history, task prompt, and format
-    instructions — is assembled into ONE plain-text string and wrapped in a
-    single HumanMessage.  This mirrors the technique used in
-    educational_agent_optimized_langsmith / shared_utils_reference.py.
+    Everything — system prompt, conversation history, last student message
+    (optional), task prompt, and format instructions — is assembled into ONE
+    plain-text string and wrapped in a single HumanMessage.
 
-    Assembled string order:
+    Assembled string order (mirrors build_prompt_from_template in reference):
         {system_prompt + language instruction}
 
         Conversation History:
         Student: ...
         Agent:   ...
+
+        Student's Latest Response: {last_user_msg}   ← only if include_last_message=True
 
         {user_prompt}
 
@@ -425,10 +433,11 @@ def build_messages_with_history(
         system_prompt: Core system instruction (tutor persona, node task, etc.)
         user_prompt: Task context / question for this turn
         format_instructions: Pydantic format instructions (appended at end)
-        remove_problem_messages: Kept for backward-compatibility; has no effect
-            in the text-serialisation pattern because SystemMessages from
-            history are rendered as "System:" lines and are already
-            distinguishable from the leading system_prompt block.
+        remove_problem_messages: Kept for backward-compatibility; no effect in
+            the text-serialisation pattern.
+        include_last_message: If True and state["last_user_msg"] is set, appends
+            the student's latest response explicitly — identical to the
+            include_last_message flag in the reference's build_prompt_from_template.
 
     Returns:
         [HumanMessage(combined_prompt_string)]  — single-element list compatible
@@ -447,14 +456,29 @@ def build_messages_with_history(
     template_parts = ["{system_prompt}"]
     template_vars = ["system_prompt"]
 
+    # Add history if available
     if history:
         template_parts.append("\n\nConversation History:\n{history}")
         template_vars.append("history")
 
+    # Add last user message if requested (reference pattern)
+    if include_last_message and state.get("last_user_msg"):
+        template_parts.append("\n\nStudent's Latest Response: {last_user_message}")
+        template_vars.append("last_user_message")
+
+    # Add the task prompt
     template_parts.append("\n\n{user_prompt}")
     template_vars.append("user_prompt")
 
+    # Add output contract and format instructions at the end for maximum recency weight.
+    # Keep format_instructions as the absolute final content seen by the LLM.
     if format_instructions:
+        template_parts.append(
+            "\n\nIMPORTANT OUTPUT CONTRACT:\n"
+            "- Return ONLY a valid JSON object.\n"
+            "- Do NOT include markdown code fences.\n"
+            "- Do NOT include any extra prose before or after JSON."
+        )
         template_parts.append("\n\n{format_instructions}")
         template_vars.append("format_instructions")
 
@@ -470,6 +494,8 @@ def build_messages_with_history(
     }
     if history:
         template_values["history"] = history
+    if include_last_message and state.get("last_user_msg"):
+        template_values["last_user_message"] = state["last_user_msg"]
     if format_instructions:
         template_values["format_instructions"] = format_instructions
 
@@ -478,6 +504,7 @@ def build_messages_with_history(
     n_history = len(state.get("messages", []))
     print(
         f"📊 Built prompt: system + {n_history} history msg(s) + task prompt"
+        + (" + last_user_msg" if include_last_message and state.get("last_user_msg") else "")
         + (" + format spec" if format_instructions else "")
     )
     print(f"📝 Prompt length: {len(final_prompt)} characters")

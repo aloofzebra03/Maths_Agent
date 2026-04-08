@@ -220,11 +220,7 @@ def assess_student_response(state: MathAgentState) -> Dict[str, Any]:
     except Exception as e:
         print(f"❌ Error parsing concept check response: {e}")
         print(f"Raw response: {response.content}")
-        # Fallback to no missing concepts
-        concept_check = ConceptCheckResponse(
-            missing_concepts=[],
-            reasoning="Unable to parse concept check response"
-        )
+        raise RuntimeError("Failed to parse CONCEPT_CHECK response") from e
     
     print(f"📊 Concept Check Results:")
     print(f"   Missing Concepts: {concept_check.missing_concepts or 'None'}")
@@ -321,10 +317,8 @@ def concept_node(state: MathAgentState) -> Dict[str, Any]:
             concept_resp = parser.parse(json_str)
         except Exception as e:
             print(f"❌ Error parsing concept response: {e}")
-            # Fallback response
-            concept_resp = ConceptResponse(
-                teaching_response=f"Hey! Let me help you understand {current_concept}. Think of it like this... [natural explanation]. Does that make sense to you?"
-            )
+            print(f"Raw response: {response.content}")
+            raise RuntimeError("Failed to parse CONCEPT response") from e
         
         # Use the natural teaching response directly
         response_message = concept_resp.teaching_response
@@ -409,12 +403,8 @@ def concept_node(state: MathAgentState) -> Dict[str, Any]:
         eval_resp = parser.parse(json_str)
     except Exception as e:
         print(f"❌ Error parsing evaluation response: {e}")
-        # Fallback: assume not understood, stay for one more try
-        eval_resp = ConceptEvaluationResponse(
-            understood=False,
-            next_state="stay" if tries < 3 else "move_on",
-            response_to_student="Let me try to explain this differently..."
-        )
+        print(f"Raw response: {response.content}")
+        raise RuntimeError("Failed to parse CONCEPT_EVAL response") from e
     
     print(f"📊 Evaluation: understood={eval_resp.understood}, next_state={eval_resp.next_state}")
     
@@ -605,13 +595,7 @@ def assess_approach_node(state: MathAgentState) -> Dict[str, Any]:
     except Exception as e:
         print(f"❌ Error parsing approach assessment response: {e}")
         print(f"Raw response: {response.content}")
-        raise e
-        # # Fallback to default values
-        # assessment = ApproachAssessmentResponse(
-        #     Tu=0.3,
-        #     Ta=0.3,
-        #     reasoning="Unable to parse assessment response"
-        # )
+        raise RuntimeError("Failed to parse APPROACH_ASSESSMENT response") from e
     
     print(f"📊 Approach Assessment Results:")
     print(f"   Tu (Understanding): {assessment.Tu:.2f}")
@@ -730,13 +714,8 @@ def _coach_logic(state: MathAgentState) -> Dict[str, Any]:
         coach_resp = parser.parse(json_str)
     except Exception as e:
         print(f"❌ Error parsing coach response: {e}")
-        # Fallback response
-        coach_resp = CoachResponse(
-            validation="Let me think about your approach.",
-            is_correct=False,
-            reflective_question="Can you explain your thinking?",
-            encouragement="You're doing great!"
-        )
+        print(f"Raw response: {response.content}")
+        raise RuntimeError("Failed to parse COACH response") from e
     
     # Build response message
     response_parts = [coach_resp.validation]
@@ -838,13 +817,8 @@ def _guided_logic(state: MathAgentState) -> Dict[str, Any]:
         guided_resp = parser.parse(json_str)
     except Exception as e:
         print(f"❌ Error parsing guided response: {e}")
-        # Fallback response
-        guided_resp = GuidedResponse(
-            acknowledgment="I see you're thinking about this.",
-            missing_piece="We need to focus on the method.",
-            hint="Think about what operation you need to do.",
-            encouragement="You're on the right track!"
-        )
+        print(f"Raw response: {response.content}")
+        raise RuntimeError("Failed to parse GUIDED response") from e
     
     # Build response message
     response_message = f"{guided_resp.acknowledgment}\n\n{guided_resp.missing_piece}\n\n{guided_resp.hint}\n\n{guided_resp.encouragement}"
@@ -949,12 +923,8 @@ def _scaffold_logic(state: MathAgentState) -> Dict[str, Any]:
         scaffold_resp = parser.parse(json_str)
     except Exception as e:
         print(f"❌ Error parsing scaffold response: {e}")
-        # Fallback response
-        scaffold_resp = ScaffoldResponse(
-            step_instruction=step_description,
-            step_context="Let's work on this step.",
-            check_question="Can you do this step?"
-        )
+        print(f"Raw response: {response.content}")
+        raise RuntimeError("Failed to parse SCAFFOLD response") from e
     
     # Build response message
     response_parts = [
@@ -1046,15 +1016,8 @@ def reflection_node(state: MathAgentState) -> Dict[str, Any]:
         reflection_resp = parser.parse(json_str)
     except Exception as e:
         print(f"❌ Error parsing reflection response: {e}")
-        # Fallback response
-        reflection_resp = ReflectionResponse(
-            appreciation="Great job solving this problem!",
-            confidence_check="How confident do you feel about this topic now?",
-            next_action_suggestions=[
-                "Try a similar problem",
-                "Take a break - you've earned it!"
-            ]
-        )
+        print(f"Raw response: {response.content}")
+        raise RuntimeError("Failed to parse REFLECTION response") from e
     
     # Build response message
     response_parts = [
