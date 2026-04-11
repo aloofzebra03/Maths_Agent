@@ -1,0 +1,22 @@
+{
+  "concepts_covered": [
+    "Place Value",
+    "Expanded Form",
+    "Decomposition of Numbers",
+    "Addition",
+    "Problem Solving Strategies (breaking down a problem)",
+    "Logical Reasoning"
+  ],
+  "num_concepts_covered": 6,
+  "clarity_conciseness_score": 4.0,
+  "user_type": "Medium",
+  "user_interest_rating": 3.0,
+  "user_engagement_rating": 4.0,
+  "enjoyment_probability": 0.75,
+  "quiz_score": 0.0,
+  "error_handling_count": 6,
+  "adaptability": true,
+  "session_id": "test_large_num_decomposition_01_confused-student_english_20260410_172757",
+  "total_interactions": 0,
+  "persona_name": "Confused Student"
+}

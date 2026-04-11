@@ -1,0 +1,23 @@
+{
+  "concepts_covered": [
+    "Basic Algebra",
+    "Equation Formation",
+    "Order of Operations (PEMDAS/BODMAS)",
+    "Positive and Negative Numbers",
+    "Variable Representation",
+    "Translating Word Problems into Mathematical Expressions",
+    "Subtraction as 'taking away'"
+  ],
+  "num_concepts_covered": 7,
+  "clarity_conciseness_score": 4.0,
+  "user_type": "Medium",
+  "user_interest_rating": 2.0,
+  "user_engagement_rating": 4.0,
+  "enjoyment_probability": 0.65,
+  "quiz_score": 0.0,
+  "error_handling_count": 12,
+  "adaptability": true,
+  "session_id": "test_integer_word_problem_02_confused-student_english_20260410_165136",
+  "total_interactions": 0,
+  "persona_name": "Confused Student"
+}

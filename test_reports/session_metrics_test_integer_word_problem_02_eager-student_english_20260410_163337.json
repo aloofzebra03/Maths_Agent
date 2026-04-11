@@ -1,0 +1,23 @@
+{
+  "concepts_covered": [
+    "Integer Operations (addition, subtraction, multiplication)",
+    "Negative Numbers",
+    "Algebraic Thinking",
+    "Variables",
+    "Equation Formation",
+    "Solving Linear Equations (one-step)",
+    "Translating Word Problems into Equations"
+  ],
+  "num_concepts_covered": 7,
+  "clarity_conciseness_score": 5.0,
+  "user_type": "High",
+  "user_interest_rating": 5.0,
+  "user_engagement_rating": 5.0,
+  "enjoyment_probability": 0.95,
+  "quiz_score": 0.0,
+  "error_handling_count": 2,
+  "adaptability": true,
+  "session_id": "test_integer_word_problem_02_eager-student_english_20260410_163337",
+  "total_interactions": 0,
+  "persona_name": "Eager Student"
+}

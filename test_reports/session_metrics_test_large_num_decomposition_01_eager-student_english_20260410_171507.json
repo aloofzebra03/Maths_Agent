@@ -1,0 +1,21 @@
+{
+  "concepts_covered": [
+    "Place Value",
+    "Decomposition of Numbers",
+    "Addition",
+    "Problem Solving Strategies",
+    "Efficient Calculation"
+  ],
+  "num_concepts_covered": 5,
+  "clarity_conciseness_score": 4.0,
+  "user_type": "High",
+  "user_interest_rating": 5.0,
+  "user_engagement_rating": 5.0,
+  "enjoyment_probability": 0.95,
+  "quiz_score": 0.0,
+  "error_handling_count": 2,
+  "adaptability": true,
+  "session_id": "test_large_num_decomposition_01_eager-student_english_20260410_171507",
+  "total_interactions": 0,
+  "persona_name": "Eager Student"
+}

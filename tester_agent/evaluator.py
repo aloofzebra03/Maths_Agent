@@ -18,11 +18,13 @@ class Evaluator:
     Note: For quantitative metrics (engagement, clarity scores, etc.), use session_metrics.py
     """
     def __init__(self):
+        print("🔍 Initializing Evaluator")
         self.llm = ChatGoogleGenerativeAI(
             model="gemma-3-27b-it",
             api_key=os.getenv("GOOGLE_API_KEY_4"),
             temperature=0.2,
         )
+        print("✓ Evaluator LLM initialized")
     #     self.llm = ChatGroq(
     #     model="llama-3.1-8b-instant",
     #     temperature=0.5,
@@ -34,6 +36,9 @@ class Evaluator:
         Evaluates the educational quality and pedagogical effectiveness of the conversation.
         Focuses on qualitative assessment complementary to quantitative session metrics.
         """
+        print(f"\n📝 Starting evaluation for persona: {persona.name}")
+        print(f"   Conversation has {len(history)} messages to evaluate")
+        
         prompt = f"""
 You are an expert in evaluating educational conversations for pedagogical effectiveness.
 Your task is to analyze the following conversation between an educational agent and a student with the persona of a "{persona.name}".
@@ -60,8 +65,12 @@ Please provide your evaluation in JSON format. Give me the json object directly 
 I want to run the function json.loads on your output directly.
 
 """
+        print("   → Calling LLM for evaluation...")
         response = self.llm.invoke(prompt)
-        return response.content
+        result = response.content
+        print(f"   ✓ Evaluation response received ({len(result)} chars)")
+        print(f"✓ Evaluation completed for {persona.name}")
+        return result
     
     def evaluate_with_metrics(self, 
                             persona: Persona, 
@@ -86,10 +95,16 @@ I want to run the function json.loads on your output directly.
             - Quantitative session metrics (engagement, performance, etc.)
             - Persona and history data
         """
+        print(f"\n📊 Starting comprehensive evaluation for session: {session_id}")
+        print(f"   Persona: {persona.name}")
+        print(f"   Upload metrics: {upload_metrics}")
+        
         # Get regular evaluation
+        print("   → Getting educational evaluation...")
         evaluation_str = self.evaluate(persona, history)
         
         # Parse evaluation
+        print("   → Parsing evaluation JSON...")
         clean_str = evaluation_str.strip()
         if clean_str.startswith("```json"):
             clean_str = clean_str[7:]
@@ -102,10 +117,12 @@ I want to run the function json.loads on your output directly.
             "educational_evaluation": json.loads(clean_str),  # Pedagogical quality assessment
             "history": history,
         }
+        print("   ✓ Educational evaluation parsed successfully")
         
         # Optionally compute and upload quantitative session metrics
         if upload_metrics:
             try:
+                print("   → Computing session metrics...")
                 session_metrics = compute_and_upload_session_metrics(
                     session_id=session_id,
                     history=history,
@@ -118,4 +135,5 @@ I want to run the function json.loads on your output directly.
                 print(f"❌ Failed to compute/upload session metrics: {e}")
                 result["metrics_error"] = str(e)
         
+        print(f"✓ Comprehensive evaluation completed for {persona.name}")
         return result

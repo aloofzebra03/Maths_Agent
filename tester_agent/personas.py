@@ -1,3 +1,10 @@
+"""
+Student Personas for Educational Agent Testing
+
+This module defines different student personas that can be used to test
+the educational agent's ability to adapt to different learning styles and behaviors.
+"""
+
 from pydantic import BaseModel
 from typing import List
 
@@ -9,7 +16,7 @@ class Persona(BaseModel):
 personas = [
     Persona(
         name="Eager Student",
-        description="An engaged and motivated student who is willing to learn.",
+        description="An engaged and motivated student who is willing to learn. Shows enthusiasm, asks clarifying questions, and actively participates in the learning process.",
         sample_phrases=[
             "Yes, I'm ready!",
             "I think it's called oscillatory motion.",
@@ -22,7 +29,7 @@ personas = [
     ),
     Persona(
         name="Confused Student",
-        description="A student who is struggling to understand the concepts.",
+        description="A student who is struggling to understand the concepts. Often uncertain, asks for clarification, and needs more detailed explanations and scaffolding.",
         sample_phrases=[
             "I'm not sure what that is.",
             "I don't know.",
@@ -35,7 +42,7 @@ personas = [
     ),
     Persona(
         name="Distracted Student",
-        description="A student who is easily distracted and goes off-topic.",
+        description="A student who is easily distracted and goes off-topic. Frequently switches between topics, shows impatience, and may not maintain focus on the learning task.",
         sample_phrases=[
             "Can we talk about something else?",
             "This is boring.",
@@ -48,7 +55,7 @@ personas = [
     ),
     Persona(
         name="Dull Student",
-        description="A student that is not very bright.",
+        description="A student that is not very bright or motivated. Struggles with comprehension, frequently asks for repetition, and may lack confidence in their abilities.",
         sample_phrases=[
             "I don't get it.",
             "Can you explain that again?",
@@ -60,3 +67,45 @@ personas = [
         ]
     )
 ]
+
+
+def get_persona_by_name(name: str) -> Persona:
+    """
+    Get a persona by its name
+    
+    Args:
+        name: Name of the persona to retrieve
+        
+    Returns:
+        Persona object if found, None otherwise
+    """
+    print(f"🔍 Searching for persona: {name}")
+    for persona in personas:
+        if persona.name.lower() == name.lower():
+            print(f"✓ Found persona: {persona.name}")
+            return persona
+    print(f"❌ Persona not found: {name}")
+    return None
+
+
+def list_all_personas() -> List[str]:
+    """
+    Get list of all available persona names
+    
+    Returns:
+        List of persona names
+    """
+    names = [p.name for p in personas]
+    print(f"📋 Available personas: {names}")
+    return names
+
+
+def print_personas_summary():
+    """Print a summary of all available personas"""
+    print("📋 AVAILABLE STUDENT PERSONAS:")
+    print("=" * 70)
+    for idx, persona in enumerate(personas, 1):
+        print(f"\n{idx}. {persona.name}")
+        print(f"   Description: {persona.description}")
+        print(f"   Sample phrases: {', '.join(persona.sample_phrases[:2])}...")
+    print("\n" + "=" * 70)
