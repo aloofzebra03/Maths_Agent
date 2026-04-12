@@ -42,7 +42,7 @@ except ImportError:
 # JSON Extraction Utility
 # ============================================================================
 
-def extract_json_block(text: str) -> str:
+def extract_json_block(text) -> str:
     """
     Extract JSON from text, handling various formats including markdown code blocks.
 
@@ -52,11 +52,18 @@ def extract_json_block(text: str) -> str:
     3. Return original text (let parser raise error)
 
     Args:
-        text: Raw text that may contain JSON
+        text: Raw text (str) or list of content parts (e.g. from models that
+              return reasoning + answer as separate blocks) that may contain JSON.
 
     Returns:
         Extracted JSON string or original text if no JSON found
     """
+    # Handle list content (e.g. gemma-4-31b-it returns [thinking_text, answer_text])
+    if isinstance(text, list):
+        text = "\n".join(
+            part if isinstance(part, str) else (part.get("text", "") if isinstance(part, dict) else str(part))
+            for part in text
+        )
     s = text.strip()
 
     # Strategy 1: Fenced code block (```json {...} ``` or ``` {...} ```)

@@ -1,0 +1,21 @@
+{
+  "concepts_covered": [
+    "Arithmetic operations",
+    "Order of operations",
+    "Problem-solving strategies",
+    "Positive and negative numbers",
+    "Translating word problems into mathematical equations"
+  ],
+  "num_concepts_covered": 5,
+  "clarity_conciseness_score": 5.0,
+  "user_type": "High",
+  "user_interest_rating": 5.0,
+  "user_engagement_rating": 5.0,
+  "enjoyment_probability": 0.95,
+  "quiz_score": 0.0,
+  "error_handling_count": 0,
+  "adaptability": true,
+  "session_id": "gemma4(31b)_test_integer_word_problem_02_eager-student_english_20260412_200506",
+  "total_interactions": 0,
+  "persona_name": "Eager Student"
+}

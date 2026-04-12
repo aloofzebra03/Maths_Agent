@@ -1,0 +1,21 @@
+{
+  "concepts_covered": [
+    "Basic Algebra",
+    "Problem Solving",
+    "Positive and Negative Numbers",
+    "Mathematical Reasoning",
+    "Equation Formulation"
+  ],
+  "num_concepts_covered": 5,
+  "clarity_conciseness_score": 5.0,
+  "user_type": "High",
+  "user_interest_rating": 4.0,
+  "user_engagement_rating": 4.0,
+  "enjoyment_probability": 0.85,
+  "quiz_score": 0.0,
+  "error_handling_count": 0,
+  "adaptability": true,
+  "session_id": "gemma4(31b)_test_integer_word_problem_02_eager-student_english_20260412_194913",
+  "total_interactions": 0,
+  "persona_name": "Eager Student"
+}
