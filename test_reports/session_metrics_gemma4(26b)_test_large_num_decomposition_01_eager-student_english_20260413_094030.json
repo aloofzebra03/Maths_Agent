@@ -1,0 +1,22 @@
+{
+  "concepts_covered": [
+    "Place Value",
+    "Decomposition of Numbers",
+    "Addition",
+    "Problem Solving",
+    "Logical Reasoning",
+    "Optimization"
+  ],
+  "num_concepts_covered": 6,
+  "clarity_conciseness_score": 5.0,
+  "user_type": "High",
+  "user_interest_rating": 5.0,
+  "user_engagement_rating": 5.0,
+  "enjoyment_probability": 0.95,
+  "quiz_score": 0.0,
+  "error_handling_count": 0,
+  "adaptability": true,
+  "session_id": "gemma4(26b)_test_large_num_decomposition_01_eager-student_english_20260413_094030",
+  "total_interactions": 0,
+  "persona_name": "Eager Student"
+}

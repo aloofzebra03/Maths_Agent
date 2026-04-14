@@ -1,0 +1,21 @@
+{
+  "concepts_covered": [
+    "Basic Algebra",
+    "Problem Solving",
+    "Translating Word Problems into Equations",
+    "Positive and Negative Numbers",
+    "Arithmetic Operations"
+  ],
+  "num_concepts_covered": 5,
+  "clarity_conciseness_score": 5.0,
+  "user_type": "Dull",
+  "user_interest_rating": 2.0,
+  "user_engagement_rating": 3.0,
+  "enjoyment_probability": 0.4,
+  "quiz_score": 0.0,
+  "error_handling_count": 0,
+  "adaptability": true,
+  "session_id": "gemma4(26b)_test_integer_word_problem_02_dull-student_english_20260413_094354",
+  "total_interactions": 0,
+  "persona_name": "Dull Student"
+}

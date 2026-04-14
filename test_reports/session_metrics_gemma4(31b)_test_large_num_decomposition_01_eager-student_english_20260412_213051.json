@@ -1,0 +1,22 @@
+{
+  "concepts_covered": [
+    "Place Value",
+    "Addition",
+    "Problem Solving",
+    "Optimization",
+    "Decomposition",
+    "Logical Reasoning"
+  ],
+  "num_concepts_covered": 6,
+  "clarity_conciseness_score": 5.0,
+  "user_type": "High",
+  "user_interest_rating": 5.0,
+  "user_engagement_rating": 5.0,
+  "enjoyment_probability": 0.95,
+  "quiz_score": 0.0,
+  "error_handling_count": 4,
+  "adaptability": true,
+  "session_id": "gemma4(31b)_test_large_num_decomposition_01_eager-student_english_20260412_213051",
+  "total_interactions": 0,
+  "persona_name": "Eager Student"
+}

@@ -1,0 +1,23 @@
+{
+  "concepts_covered": [
+    "Positive and Negative Numbers",
+    "Multiplication of Integers",
+    "Subtraction of Integers",
+    "Integer Division",
+    "Algebraic Thinking (using variables)",
+    "Word Problem Solving",
+    "Order of Operations"
+  ],
+  "num_concepts_covered": 7,
+  "clarity_conciseness_score": 3.0,
+  "user_type": "Dull",
+  "user_interest_rating": 1.0,
+  "user_engagement_rating": 2.0,
+  "enjoyment_probability": 0.2,
+  "quiz_score": 0.0,
+  "error_handling_count": 15,
+  "adaptability": true,
+  "session_id": "gemma4(31b)_test_integer_word_problem_02_dull-student_english_20260412_202701",
+  "total_interactions": 0,
+  "persona_name": "Dull Student"
+}

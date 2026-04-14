@@ -1,0 +1,21 @@
+{
+  "concepts_covered": [
+    "Positive and negative numbers",
+    "Arithmetic operations (addition, subtraction, multiplication, division)",
+    "Order of operations",
+    "Problem-solving with variables",
+    "Translating word problems into mathematical equations"
+  ],
+  "num_concepts_covered": 5,
+  "clarity_conciseness_score": 4.0,
+  "user_type": "Medium",
+  "user_interest_rating": 2.0,
+  "user_engagement_rating": 3.0,
+  "enjoyment_probability": 0.6,
+  "quiz_score": 0.0,
+  "error_handling_count": 3,
+  "adaptability": true,
+  "session_id": "gemma4(31b)_test_integer_word_problem_02_distracted-student_english_20260412_201844",
+  "total_interactions": 0,
+  "persona_name": "Distracted Student"
+}

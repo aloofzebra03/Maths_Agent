@@ -1,0 +1,25 @@
+{
+  "concepts_covered": [
+    "Integer Operations (addition, subtraction)",
+    "Multiplication",
+    "Division",
+    "Negative Numbers",
+    "Order of Operations",
+    "Problem Solving",
+    "Algebraic Thinking (using variables)",
+    "Integer Division",
+    "Distance on a Number Line"
+  ],
+  "num_concepts_covered": 9,
+  "clarity_conciseness_score": 4.0,
+  "user_type": "Medium",
+  "user_interest_rating": 2.0,
+  "user_engagement_rating": 4.0,
+  "enjoyment_probability": 0.7,
+  "quiz_score": 0.0,
+  "error_handling_count": 10,
+  "adaptability": true,
+  "session_id": "gemma4(31b)_test_integer_word_problem_02_confused-student_english_20260412_200930",
+  "total_interactions": 0,
+  "persona_name": "Confused Student"
+}

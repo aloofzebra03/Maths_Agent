@@ -6,12 +6,12 @@ load_dotenv(dotenv_path = ".env", override=True)
 AVAILABLE_MODELS = [
     # "gemini-2.5-flash",
     # "gemma-3-27b-it",
-    "gemma-4-31b-it",
+    "gemma-4-26b-a4b-it",
     
 ]
 
 # Default model
-DEFAULT_MODEL = "gemma-4-31b-it"
+DEFAULT_MODEL = "gemma-4-26b-a4b-it"
 
 # Rate limits per model (requests per minute and per day)
 # RATE_LIMITS = {
