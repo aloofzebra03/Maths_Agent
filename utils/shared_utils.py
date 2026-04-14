@@ -42,44 +42,41 @@ except ImportError:
 # JSON Extraction Utility
 # ============================================================================
 
-def extract_json_block(text) -> str:
+def _extract_json_from_str(s: str):
     """
-    Extract JSON from text, handling various formats including markdown code blocks.
+    Try to extract a JSON object from a single string.
+    Returns the JSON string on success, or None if not found.
 
-    Tries three strategies:
-    1. Fenced code block with optional 'json' language tag
-    2. First balanced JSON object (matching braces)
-    3. Return original text (let parser raise error)
-
-    Args:
-        text: Raw text (str) or list of content parts (e.g. from models that
-              return reasoning + answer as separate blocks) that may contain JSON.
-
-    Returns:
-        Extracted JSON string or original text if no JSON found
+    Scans every '{' in the string as a potential JSON start, validates each
+    candidate with json.loads, and returns the first that parses cleanly.
+    This avoids false positives like bare '{word}' patterns in reasoning text.
     """
-    # Handle list content (e.g. gemma-4-31b-it returns [thinking_text, answer_text])
-    if isinstance(text, list):
-        text = "\n".join(
-            part if isinstance(part, str) else (part.get("text", "") if isinstance(part, dict) else str(part))
-            for part in text
-        )
-    s = text.strip()
+    s = s.strip()
 
     # Strategy 1: Fenced code block (```json {...} ``` or ``` {...} ```)
     m = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", s, flags=re.DOTALL | re.IGNORECASE)
     if m:
-        result = m.group(1).strip()
-        print(f"🎯 JSON extracted from fenced code block")
-        return result
+        candidate = m.group(1).strip()
+        try:
+            json.loads(candidate)
+            return candidate
+        except json.JSONDecodeError:
+            pass
 
-    # Strategy 2: Find first balanced JSON object
-    start = s.find("{")
-    if start != -1:
+    # Strategy 2: Try every '{' as a potential JSON start, validate each candidate
+    i = 0
+    while i < len(s):
+        if s[i] != "{":
+            i += 1
+            continue
+        # Attempt to find the matching '}' for this '{'
+        start = i
         depth = 0
         in_str = False
         esc = False
-        for i, ch in enumerate(s[start:], start=start):
+        j = start
+        while j < len(s):
+            ch = s[j]
             if in_str:
                 if esc:
                     esc = False
@@ -95,13 +92,60 @@ def extract_json_block(text) -> str:
                 elif ch == "}":
                     depth -= 1
                     if depth == 0:
-                        result = s[start:i+1].strip()
-                        print(f"🎯 JSON extracted using balanced braces")
-                        return result
+                        candidate = s[start:j + 1].strip()
+                        try:
+                            json.loads(candidate)
+                            return candidate
+                        except json.JSONDecodeError:
+                            break  # This start '{' doesn't yield valid JSON; try next
+            j += 1
+        i += 1  # Advance past this '{' and try the next one
 
-    # Strategy 3: No JSON found, return original
+    return None
+
+
+def extract_json_block(text) -> str:
+    """
+    Extract JSON from text, handling various formats including markdown code blocks.
+
+    Tries the following strategies in order:
+    1. If input is a list (e.g. gemma-4-31b-it thinking + answer parts), scan
+       each part individually from last to first — this avoids picking up
+       bare ``{...}`` patterns from reasoning/thinking blocks.
+    2. Fenced code block with optional 'json' language tag
+    3. First balanced JSON object that is valid JSON
+    4. Return original text (let parser raise error)
+
+    Args:
+        text: Raw text (str) or list of content parts (e.g. from models that
+              return reasoning + answer as separate blocks) that may contain JSON.
+
+    Returns:
+        Extracted JSON string or original text if no JSON found
+    """
+    if isinstance(text, list):
+        # Normalise each part to a string
+        parts = [
+            part if isinstance(part, str) else (part.get("text", "") if isinstance(part, dict) else str(part))
+            for part in text
+        ]
+        # Scan from last part to first — the answer is typically the final element
+        for part in reversed(parts):
+            result = _extract_json_from_str(part)
+            if result is not None:
+                print(f"🎯 JSON extracted from list part (reversed scan)")
+                return result
+        # Fallback: join all parts and try once more
+        text = "\n".join(parts)
+
+    result = _extract_json_from_str(text)
+    if result is not None:
+        print(f"🎯 JSON extracted from text")
+        return result
+
+    # No JSON found — return original so parser can raise a meaningful error
     print("⚠️ No JSON found in text, returning original")
-    return s
+    return text if isinstance(text, str) else str(text)
 
 
 # ============================================================================
@@ -181,6 +225,42 @@ def invoke_llm_with_fallback(messages: List, operation_name: str = "LLM call"):
     except Exception as e:
         print(f"❌ {operation_name} - Failed with model: {selected_model}. Error: {str(e)}")
         raise
+
+
+def translate_to_kannada_google(text: str,
+                               source: str = "en",
+                               target: str = "kn") -> str:
+    """
+    Translate text to Kannada using deep_translator GoogleTranslator.
+
+    Args:
+        text: Text to translate
+        source: Source language code (default: "en")
+        target: Target language code (default: "kn")
+
+    Returns:
+        Translated text in Kannada.
+
+    Notes:
+        Used by translate_if_kannada as the primary Kannada translation backend.
+        translate_to_kannada_azure is retained as an alternative if needed.
+    """
+    try:
+        # Lazy import keeps this module import-safe if deep_translator is absent.
+        from deep_translator import GoogleTranslator
+
+        translated_text = GoogleTranslator(source=source, target=target).translate(text)
+        print(f"✅ GoogleTranslator translation success: {translated_text[:50]}...")
+        return translated_text
+    except ImportError as e:
+        error_msg = (
+            "⚠️ deep_translator is not installed. Install with `pip install deep-translator`."
+        )
+        print(error_msg)
+        raise ImportError(error_msg) from e
+    except Exception as e:
+        print(f"⚠️ GoogleTranslator translation error: {str(e)}")
+        raise Exception(f"GoogleTranslator translation error: {str(e)}")
 
 
 def translate_to_kannada_azure(text: str,
@@ -264,7 +344,13 @@ def translate_to_english_gemini(text: str) -> str:
 
     try:
         response = invoke_llm_with_fallback(msgs, operation_name="Kannada-to-English translation")
-        translated = response.content.strip()
+        content = response.content
+        if isinstance(content, list):
+            content = "\n".join(
+                p if isinstance(p, str) else (p.get("text", "") if isinstance(p, dict) else str(p))
+                for p in content
+            )
+        translated = content.strip()
         print(f"✅ Translated to English: {translated[:80]}...")
         return translated
     except Exception as e:
@@ -286,7 +372,8 @@ def translate_if_kannada(state: AgentState, content: str) -> str:
     """
     if state.get("is_kannada", False):
         if re.search(r"[a-zA-Z]", content):
-            return translate_to_kannada_azure(content)
+            print("🌐 Translating English response to Kannada...")
+            return translate_to_kannada_google(content)
         print("✅ Content is pure Kannada, no translation needed.")
     return content
 

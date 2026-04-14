@@ -252,27 +252,51 @@ def run_test():
             return
     
     print(f"\n✅ Selected persona: {selected_persona.name}")
-    
+
+    # ========================================================================
+    # Step 3b: Language Selection
+    # ========================================================================
+
+    print("\n" + "="*80)
+    print("🌐 Select language:")
+    print("="*80)
+    print("1. English")
+    print("2. Kannada (ಕನ್ನಡ)")
+    print()
+
+    while True:
+        try:
+            lang_choice = input("Enter language number (default 1): ").strip() or "1"
+            if lang_choice in ("1", "2"):
+                break
+            print("❌ Invalid choice. Please enter 1 or 2.")
+        except KeyboardInterrupt:
+            print("\n\n❌ Test cancelled by user")
+            return
+
+    is_kannada = lang_choice == "2"
+    language = "kannada" if is_kannada else "english"
+    print(f"\n✅ Selected language: {language.capitalize()}")
+
     # ========================================================================
     # Step 4: Session Initialization
     # ========================================================================
-    
+
     # Create session ID (matching format from run_test_api.py)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     persona_name_slug = selected_persona.name.lower().replace(' ', '-')
-    language = "english"  # Math tutor agent currently only supports English
-    session_id = f"gemma4(31b)_test_{selected_problem_id}_{persona_name_slug}_{language}_{timestamp}"
+    session_id = f"gemma4(26b)_test_{selected_problem_id}_{persona_name_slug}_{language}_{timestamp}"
     thread_id = session_id
-    
+
     print("\n" + "="*80)
     print("🚀 Starting Session")
     print("="*80)
     print(f"Session ID: {session_id}")
     print(f"Thread ID: {thread_id}")
     print()
-    
+
     # Initialize tester agent
-    tester_agent = TesterAgent(selected_persona)
+    tester_agent = TesterAgent(selected_persona, is_kannada=is_kannada)
     
     # LangGraph config
     config = {
@@ -290,6 +314,7 @@ def run_test():
     initial_state = {
         "problem_id": selected_problem_id,
         "messages": [HumanMessage(content="Hello")],
+        "is_kannada": is_kannada,
     }
     
     try:
