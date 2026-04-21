@@ -1,11 +1,11 @@
-"""
+﻿"""
 Input processor for detecting and handling multimodal student inputs.
 Supports text, image file paths, and base64 encoded images.
 """
 
 import os
 from typing import Dict, Any
-from educational_agent_math_tutor.ocr_handler import (
+from utils.shared_utils import (
     process_image_from_path,
     process_image_from_base64
 )
@@ -56,7 +56,7 @@ def is_base64_image(content: str) -> bool:
     # Check for Streamlit format: direct data URI string
     if isinstance(content, str):
         if content.startswith('data:image/'):
-            print("✅ Detected Streamlit base64 format")
+            print("âœ… Detected Streamlit base64 format")
             return True
         return False
     
@@ -65,7 +65,7 @@ def is_base64_image(content: str) -> bool:
         if isinstance(content[0], dict) and 'image_url' in content[0]:
             url = content[0].get('image_url', {}).get('url', '')
             if url.startswith('data:image/'):
-                print("✅ Detected LangGraph Studio base64 format")
+                print("âœ… Detected LangGraph Studio base64 format")
                 return True
     
     return False
@@ -103,7 +103,7 @@ def detect_and_process_input(content: str) -> Dict[str, Any]:
     
     # Check for base64 image (must check before file path)
     if is_base64_image(content):
-        print(f"📸 Detected base64 image input")
+        print(f"ðŸ“¸ Detected base64 image input")
         
         # Extract base64 data based on format
         if isinstance(content, str):
@@ -125,7 +125,7 @@ def detect_and_process_input(content: str) -> Dict[str, Any]:
     
     # Check for image file path
     if is_image_path(content):
-        print(f"📸 Detected image file path: {content}")
+        print(f"ðŸ“¸ Detected image file path: {content}")
         result = process_image_from_path(content)
         return {
             "processed_text": result["text"],
@@ -143,3 +143,5 @@ def detect_and_process_input(content: str) -> Dict[str, Any]:
         "success": True,
         "original_content": content
     }
+
+
