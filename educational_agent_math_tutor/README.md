@@ -137,6 +137,7 @@ python test_agent.py
 ## 📊 State Fields
 
 ### Core Fields
+
 - `problem`: Problem text
 - `problem_id`: Identifier for loading from JSON
 - `Ta`: Approach quality score (0-1)
@@ -145,6 +146,7 @@ python test_agent.py
 - `solved`: Whether problem is complete
 
 ### Tracking Fields
+
 - `steps`: Solution steps from JSON (with concept info)
 - `step_index`: Current step in scaffold mode
 - `nudge_count`: Reflective questions asked in coach mode
@@ -152,6 +154,7 @@ python test_agent.py
 - `node_transitions`: List of transitions with timestamps
 
 ### Future Enhancement Fields
+
 - `summary`: Rolling conversation summary (unused for now)
 - `summary_last_index`: Last summarized message index (unused for now)
 
@@ -160,11 +163,13 @@ python test_agent.py
 ### Assessment Rubrics
 
 **Tu (Understanding) - 3 criteria:**
+
 1. Identifies what operation is needed
 2. Understands problem terms/meaning
 3. Knows what result represents
 
 **Ta (Approach) - 3 criteria:**
+
 1. Mentions correct method
 2. Logical step order
 3. Handles conversions/edge cases
@@ -220,18 +225,22 @@ Edit [config.py](educational_agent_math_tutor/config.py) to adjust:
 ## 🛠️ Future Enhancements
 
 ### Memory Optimization (Prepared but Not Implemented)
+
 The wrapper pattern in [graph.py](educational_agent_math_tutor/graph.py) is designed to easily add:
+
 - Conversation summarization
 - Node-aware history segmentation
 - Rolling summary updates
 
 To enable later, enhance the wrapper to:
+
 1. Capture old state before node call
 2. Detect new user messages
 3. Build summaries using `node_transitions`
 4. Populate `summary` and `summary_last_index` fields
 
 ### Other Enhancements
+
 - Autosuggestions (positive/negative/special handling)
 - Multi-language support
 - Voice/OCR input normalization
@@ -246,6 +255,7 @@ To enable later, enhance the wrapper to:
 - `pydantic` (for structured outputs)
 
 Optional:
+
 - `api_tracker_utils` (for API key management and rate limiting)
 
 ## 🧪 Testing Different Scenarios
@@ -282,11 +292,8 @@ AGENT: [REFLECTION] Excellent work! You figured out that when denominators
 ## 🤝 Contributing
 
 To add new problems:
+
 1. Add JSON file to `problems_json/`
 2. Follow the canonical structure
 3. Include steps with concepts
 4. Test with `test_agent.py`
-
-## 📄 License
-
-[Your License Here]
