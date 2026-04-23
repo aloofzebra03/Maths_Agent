@@ -5,7 +5,7 @@ Supports text, image file paths, and base64 encoded images.
 
 import os
 from typing import Dict, Any
-from utils.shared_utils import (
+from utils.ocr_utilities import (
     process_image_from_path,
     process_image_from_base64
 )

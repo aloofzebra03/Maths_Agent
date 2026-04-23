@@ -24,8 +24,8 @@ from api_servers_reference.schemas import (
     ProblemInfo,
     ProblemsListResponse,
 )
-from api_tracker_utils.error import MinuteLimitExhaustedError, DayLimitExhaustedError
-from utils.shared_utils import process_image_from_path
+from api_tracker_utils.error import APITrackerError, MinuteLimitExhaustedError, DayLimitExhaustedError
+from utils.ocr_utilities import process_image_from_path
 
 
 MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024  # 10MB
@@ -426,6 +426,14 @@ def start_session(request: StartSessionRequest):
             status_code = 502,
             detail=f"Error processing query: {e}"
         )
+
+    except APITrackerError as e:
+        print(f"[API] Tracker error: {e}")
+        print(f"Full traceback:\n{traceback.format_exc()}")
+        raise HTTPException(
+            status_code=503,
+            detail=f"Tracker error: {e}"
+        )
     
     except Exception as e:
         print(f"API error in /session/start: {str(e)}")
@@ -526,6 +534,14 @@ def continue_session(
         raise HTTPException(
             status_code = 502,
             detail=f"Error processing query: {e}"
+        )
+
+    except APITrackerError as e:
+        print(f"[API] Tracker error: {e}")
+        print(f"Full traceback:\n{traceback.format_exc()}")
+        raise HTTPException(
+            status_code=503,
+            detail=f"Tracker error: {e}"
         )
         
     except HTTPException:
